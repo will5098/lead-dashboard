@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Google Ads Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0f0f11;
+    --surface: #18181c;
+    --surface2: #202026;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0f0f0;
+    --muted: #888;
+    --dim: #555;
+    --blue: #4a9eff;
+    --blue-dim: #1a3a5c;
+    --green: #4ecb8b;
+    --green-dim: #1a3d2b;
+    --red: #ff5f5f;
+    --red-dim: #3d1a1a;
+    --amber: #f5a623;
+    --amber-dim: #3d2a0a;
+    --purple: #9b7fff;
+    --teal: #2dd4bf;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  nav {
+    padding: 0 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 0;
+    align-items: stretch;
+    height: 44px;
+  }
+  .nav-link {
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    font-size: 13px;
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s;
+  }
+  .nav-link:hover { color: var(--text); }
+  .nav-link.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+  header {
+    padding: 24px 32px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .header-left h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+  .header-left p { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text);
+    transition: background 0.15s;
+  }
+  .btn:hover { background: #2a2a32; }
+  .btn-primary { background: var(--blue); border-color: var(--blue); color: #000; font-weight: 600; }
+  .btn-primary:hover { background: #6ab4ff; }
+  .btn-danger { background: transparent; border-color: var(--red); color: var(--red); }
+  .btn-danger:hover { background: var(--red-dim); }
+  #fileInput { display: none; }
+
+  .weeks-pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 10px 32px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    min-height: 44px;
+  }
+  .weeks-pills span { font-size: 11px; color: var(--muted); margin-right: 4px; }
+  .pill {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .pill button { background: none; border: none; color: var(--dim); cursor: pointer; font-size: 13px; line-height: 1; padding: 0; }
+  .pill button:hover { color: var(--red); }
+
+  main { padding: 24px 32px; max-width: 1100px; }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .kpi-label { font-size: 11px; color: var(--muted); margin-bottom: 5px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+  .kpi-value { font-size: 24px; font-weight: 600; font-family: 'DM Mono', monospace; letter-spacing: -0.03em; }
+  .kpi-sub { font-size: 11px; margin-top: 4px; color: var(--muted); }
+  .kpi-sub.up { color: var(--green); }
+  .kpi-sub.down { color: var(--red); }
+
+  .alerts { margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px; }
+  .alert { padding: 10px 14px; border-radius: 8px; font-size: 12px; line-height: 1.6; border-left: 3px solid; }
+  .alert-warn { background: var(--amber-dim); border-color: var(--amber); color: #d4a04a; }
+  .alert-danger { background: var(--red-dim); border-color: var(--red); color: #e07070; }
+  .alert-ok { background: var(--green-dim); border-color: var(--green); color: #50b87a; }
+  .alert strong { font-weight: 600; }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .chart-full { grid-column: 1 / -1; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .card-title { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+  .ldot { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+
+  .chart-wrap { position: relative; width: 100%; }
+
+  .campaign-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
+  .campaign-table th { text-align: left; padding: 6px 10px; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim); border-bottom: 1px solid var(--border); }
+  .campaign-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--muted); vertical-align: middle; }
+  .campaign-table tr:last-child td { border-bottom: none; }
+  .campaign-table tr:hover td { background: var(--surface2); color: var(--text); }
+  .campaign-table .num { font-family: 'DM Mono', monospace; text-align: right; }
+  .status-pill { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 500; }
+  .status-eligible { background: #1a3d2b; color: var(--green); }
+  .status-limited { background: var(--amber-dim); color: var(--amber); }
+  .status-paused { background: #2a2a2a; color: var(--dim); }
+  .status-ended { background: #2a1a1a; color: #884444; }
+
+  .is-bar { display: flex; align-items: center; gap: 6px; }
+  .is-track { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .is-fill { height: 100%; border-radius: 3px; background: var(--blue); }
+  .is-lost { height: 100%; border-radius: 3px; background: var(--red); opacity: 0.5; }
+
+  .is-num { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); min-width: 30px; text-align: right; }
+
+  /* ── Slide-out panel ── */
+  .panel-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; }
+  .panel-overlay.open { display:block; }
+  .panel {
+    position:fixed; top:0; right:0; bottom:0; width:min(680px,95vw);
+    background:var(--surface); border-left:1px solid var(--border2);
+    z-index:201; transform:translateX(100%); transition:transform 0.25s cubic-bezier(0.4,0,0.2,1);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .panel.open { transform:translateX(0); }
+  .panel-header {
+    padding:20px 24px 16px; border-bottom:1px solid var(--border);
+    display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-shrink:0;
+  }
+  .panel-title { font-size:15px; font-weight:600; letter-spacing:-0.02em; line-height:1.3; }
+  .panel-subtitle { font-size:12px; color:var(--muted); margin-top:3px; }
+  .panel-close {
+    background:none; border:1px solid var(--border2); color:var(--muted); cursor:pointer;
+    border-radius:6px; padding:4px 10px; font-size:18px; line-height:1; flex-shrink:0;
+    transition:background 0.15s;
+  }
+  .panel-close:hover { background:var(--surface2); color:var(--text); }
+  .panel-body { padding:20px 24px; overflow-y:auto; flex:1; }
+  .panel-kpis { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:20px; }
+  .panel-kpi { background:var(--surface2); border-radius:8px; padding:10px 12px; }
+  .panel-kpi-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px; }
+  .panel-kpi-value { font-size:18px; font-weight:600; font-family:'DM Mono',monospace; }
+  .panel-kpi-sub { font-size:11px; margin-top:2px; color:var(--muted); }
+  .panel-section { font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--muted); margin:18px 0 10px; }
+  .panel-chart-wrap { position:relative; width:100%; }
+  .vs-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
+  .vs-card { background:var(--surface2); border-radius:8px; padding:10px 12px; }
+  .vs-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; }
+  .vs-bar-row { display:flex; align-items:center; gap:8px; margin-bottom:5px; font-size:11px; }
+  .vs-bar-track { flex:1; height:5px; background:var(--surface); border-radius:3px; overflow:hidden; }
+  .vs-bar-fill { height:100%; border-radius:3px; }
+  .vs-name { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--muted); flex:1; }
+  .vs-val { font-family:'DM Mono',monospace; font-size:11px; min-width:50px; text-align:right; }
+  .campaign-row-clickable { cursor:pointer; }
+  .campaign-row-clickable:hover td { background:var(--surface2) !important; color:var(--text) !important; }
+  .campaign-row-clickable.active td { background:#1a2a3a !important; color:var(--text) !important; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-state h2 { font-size: 16px; font-weight: 500; margin-bottom: 8px; color: var(--text); }
+  .empty-state p { font-size: 13px; line-height: 1.6; max-width: 400px; margin: 0 auto 20px; }
+
+  .drop-overlay { display: none; position: fixed; inset: 0; background: rgba(74,158,255,0.08); border: 3px dashed var(--blue); z-index: 100; align-items: center; justify-content: center; font-size: 20px; font-weight: 600; color: var(--blue); }
+  .drop-overlay.active { display: flex; }
+
+  footer { padding: 20px 32px; border-top: 1px solid var(--border); font-size: 11px; color: var(--dim); display: flex; justify-content: space-between; margin-top: 32px; }
+
+  @media (max-width: 700px) {
+    header, main, .weeks-pills, nav, footer { padding-left: 16px; padding-right: 16px; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .chart-full { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="drop-overlay" id="dropOverlay">Drop Google Ads CSV to add a week</div>
+
+<div class="panel-overlay" id="panelOverlay" onclick="closePanel()"></div>
+<div class="panel" id="campaignPanel">
+  <div class="panel-header">
+    <div>
+      <div class="panel-title" id="panelTitle">Campaign</div>
+      <div class="panel-subtitle" id="panelSubtitle"></div>
+    </div>
+    <button class="panel-close" onclick="closePanel()">×</button>
+  </div>
+  <div class="panel-body" id="panelBody"></div>
+</div>
+
+<nav>
+  <a class="nav-link" href="index.html">Lead sources</a>
+  <a class="nav-link active" href="google-ads.html">Google Ads</a>
+</nav>
+
+<header>
+  <div class="header-left">
+    <h1>Google Ads performance</h1>
+    <p>Campaign-level data — upload weekly Google Ads campaign reports</p>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <input type="file" id="fileInput" accept=".csv" multiple>
+    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">+ Upload campaign report CSV</button>
+    <button class="btn btn-danger" onclick="clearAll()" id="clearBtn" style="display:none">Clear all</button>
+  </div>
+</header>
+
+<div class="weeks-pills" id="weeksPills">
+  <span>Weeks loaded:</span>
+  <em style="font-size:12px;color:var(--dim);font-style:normal">None — upload a campaign report CSV to begin</em>
+</div>
+
+<main id="main">
+  <div class="empty-state" id="emptyState">
+    <h2>No data yet</h2>
+    <p>Upload your weekly Google Ads campaign report CSV. Export from Google Ads → Reports → Campaign report, selecting Impressions, Clicks, Cost, Conversions, CTR, CPC, and Impression Share columns.</p>
+    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">Upload CSV</button>
+  </div>
+
+  <div id="dashboard" style="display:none">
+    <div class="kpi-grid" id="kpiGrid"></div>
+    <div class="alerts" id="alerts"></div>
+
+    <div class="charts-grid">
+      <div class="card">
+        <div class="card-title">Clicks by week</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="clicksChart" role="img" aria-label="Clicks per week"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Spend by week (£)</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="spendChart" role="img" aria-label="Spend per week"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Avg. CPC by week (£)</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="cpcChart" role="img" aria-label="Average CPC per week"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Conversions by week</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="convChart" role="img" aria-label="Conversions per week"></canvas></div>
+      </div>
+      <div class="card chart-full">
+        <div class="card-title">Impression share vs lost IS (rank) — latest week, search campaigns</div>
+        <div class="chart-wrap" style="height:240px"><canvas id="isChart" role="img" aria-label="Impression share by campaign"></canvas></div>
+      </div>
+      <div class="card chart-full">
+        <div class="card-title">Campaign breakdown — latest week</div>
+        <div style="overflow-x:auto">
+          <table class="campaign-table" id="campaignTable">
+            <thead>
+              <tr>
+                <th>Campaign</th>
+                <th>Status</th>
+                <th class="num">Budget</th>
+                <th class="num">Impr.</th>
+                <th class="num">Clicks</th>
+                <th class="num">CTR</th>
+                <th class="num">Conv.</th>
+                <th class="num">Cost £</th>
+                <th class="num">Conv. rate</th>
+                <th class="num">Avg CPC £</th>
+                <th>Impr. share</th>
+              </tr>
+            </thead>
+            <tbody id="campaignBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>Google Ads dashboard — internal use only</span>
+  <span id="lastUpdated"></span>
+</footer>
+
+<script>
+const STORAGE_KEY = 'google_ads_dashboard_v1';
+let weeks = [];
+
+function saveState() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(weeks)); } catch(e) {} }
+function loadState() { try { const s = localStorage.getItem(STORAGE_KEY); if (s) weeks = JSON.parse(s); } catch(e) { weeks = []; } }
+
+function cleanNum(v) {
+  if (v == null) return 0;
+  const s = String(v).replace(/,/g,'').replace(/%/g,'').replace(/--/g,'0').trim();
+  return parseFloat(s) || 0;
+}
+
+function statusClass(status) {
+  const s = (status||'').toLowerCase();
+  if (s.includes('ended')) return 'status-ended';
+  if (s.includes('paused')) return 'status-paused';
+  if (s.includes('limited')) return 'status-limited';
+  if (s.includes('eligible')) return 'status-eligible';
+  return '';
+}
+
+function statusLabel(status) {
+  const s = (status||'').toLowerCase();
+  if (s.includes('ended')) return 'Ended';
+  if (s.includes('paused')) return 'Paused';
+  if (s.includes('limited')) return 'Limited';
+  if (s.includes('eligible')) return 'Eligible';
+  return status || '—';
+}
+
+function parseCSV(text, filename) {
+  // Detect date range from row 2
+  const lines = text.split('\n');
+  let dateLabel = '';
+  if (lines[1]) {
+    dateLabel = lines[1].trim().replace(/"/g,'');
+  }
+  if (!dateLabel) dateLabel = filename.replace('.csv','');
+
+  // Slice off the first 2 rows so PapaParse sees column headers first
+  const csvBody = lines.slice(2).join('\n');
+  const result = Papa.parse(csvBody, { header: true, skipEmptyLines: true });
+  const rows = result.data;
+
+  // Filter to real campaign rows (not totals/blank)
+  const campaigns = rows.filter(r => {
+    const name = (r['Campaign'] || '').trim();
+    return name && name !== '--' && !name.startsWith('NaN');
+  }).map(r => ({
+    name: r['Campaign'] || '',
+    status: r['Status'] || '',
+    type: r['Campaign type'] || '',
+    budget: cleanNum(r['Budget']),
+    impressions: cleanNum(r['Impr.']),
+    clicks: cleanNum(r['Clicks']),
+    ctr: cleanNum(r['CTR']),
+    conversions: cleanNum(r['Conversions']),
+    cost: cleanNum(r['Cost']),
+    cpc: cleanNum(r['Avg. CPC']),
+    is: cleanNum(r['Search impr. share']),
+    isLost: cleanNum(r['Search lost IS (rank)']),
+    costPerConv: cleanNum(r['Cost / conv.']),
+    convRate: cleanNum(r['Conv. rate'])
+  })).filter(c => c.impressions > 0 || c.clicks > 0);
+
+  // Aggregate totals — use search only for cleaner picture
+  const search = campaigns.filter(c => c.type === 'Search');
+  const all = campaigns;
+
+  const totalClicks = all.reduce((a,c) => a+c.clicks, 0);
+  const totalSpend = all.reduce((a,c) => a+c.cost, 0);
+  const totalConv = all.reduce((a,c) => a+c.conversions, 0);
+  const totalImpr = all.reduce((a,c) => a+c.impressions, 0);
+  const avgCPC = totalClicks > 0 ? totalSpend/totalClicks : 0;
+  const avgIS = search.length > 0 ? search.reduce((a,c) => a+c.is, 0)/search.filter(c=>c.is>0).length : 0;
+
+  return { dateLabel, campaigns, totalClicks, totalSpend, totalConv, totalImpr, avgCPC, avgIS, filename };
+}
+
+// ─── Charts ──────────────────────────────────────────────────────────────────
+let charts = {};
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+const TICK = { color: '#666', font: { family: 'DM Mono', size: 11 } };
+const GRID = { color: 'rgba(255,255,255,0.05)' };
+const BASE = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { display: false }, tooltip: { backgroundColor: '#202026', titleColor: '#ccc', bodyColor: '#999', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 } },
+  scales: { x: { ticks: { ...TICK, autoSkip: false, maxRotation: weeks.length > 5 ? 45 : 0 }, grid: { display: false } }, y: { ticks: TICK, grid: GRID, beginAtZero: true } }
+};
+
+function renderCharts() {
+  const labels = weeks.map(w => w.dateLabel);
+  const n = weeks.length;
+  const hi = (i) => i === n-1 ? '#4a9eff' : '#2a3a4a';
+  const hiAmber = (i) => i === n-1 ? '#f5a623' : '#3a2a10';
+  const hiGreen = (i) => i === n-1 ? '#4ecb8b' : '#1a3a2a';
+  const hiRed = (i) => i === n-1 ? '#ff5f5f' : '#3a1a1a';
+
+  destroyChart('clicksChart');
+  charts['clicksChart'] = new Chart(document.getElementById('clicksChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: weeks.map(w=>w.totalClicks), backgroundColor: weeks.map((_,i)=>hi(i)), borderRadius: 4 }] },
+    options: BASE
+  });
+
+  destroyChart('spendChart');
+  charts['spendChart'] = new Chart(document.getElementById('spendChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: weeks.map(w=>Math.round(w.totalSpend)), backgroundColor: weeks.map((_,i)=>hiAmber(i)), borderRadius: 4 }] },
+    options: { ...BASE, scales: { ...BASE.scales, y: { ...BASE.scales.y, ticks: { ...TICK, callback: v => '£'+v.toLocaleString() } } } }
+  });
+
+  destroyChart('cpcChart');
+  charts['cpcChart'] = new Chart(document.getElementById('cpcChart'), {
+    type: 'line',
+    data: { labels, datasets: [{ data: weeks.map(w=>+w.avgCPC.toFixed(2)), borderColor: '#f5a623', backgroundColor: 'rgba(245,166,35,0.08)', tension: 0.35, pointRadius: 5, fill: true }] },
+    options: { ...BASE, scales: { ...BASE.scales, y: { ...BASE.scales.y, ticks: { ...TICK, callback: v => '£'+v.toFixed(2) } } } }
+  });
+
+  destroyChart('convChart');
+  charts['convChart'] = new Chart(document.getElementById('convChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: weeks.map(w=>+w.totalConv.toFixed(1)), backgroundColor: weeks.map((_,i)=>hiGreen(i)), borderRadius: 4 }] },
+    options: BASE
+  });
+
+  // Impression share horizontal bar — latest week search campaigns
+  const latest = weeks[weeks.length-1];
+  const searchCamps = latest.campaigns.filter(c => c.type === 'Search' && (c.is > 0 || c.isLost > 0));
+  const campLabels = searchCamps.map(c => c.name.length > 38 ? c.name.substring(0,36)+'…' : c.name);
+
+  destroyChart('isChart');
+  charts['isChart'] = new Chart(document.getElementById('isChart'), {
+    type: 'bar',
+    data: {
+      labels: campLabels,
+      datasets: [
+        { label: 'Impression share', data: searchCamps.map(c=>c.is), backgroundColor: '#4a9eff', borderRadius: 2 },
+        { label: 'Lost IS (rank)', data: searchCamps.map(c=>c.isLost), backgroundColor: 'rgba(255,95,95,0.4)', borderRadius: 2 }
+      ]
+    },
+    options: {
+      ...BASE,
+      indexAxis: 'y',
+      plugins: { ...BASE.plugins, legend: { display: true, labels: { color: '#666', font: { size: 11, family: 'DM Sans' }, boxWidth: 10, boxHeight: 10 } } },
+      scales: {
+        x: { ticks: { ...TICK, callback: v => v+'%' }, grid: GRID, max: 100 },
+        y: { ticks: { ...TICK, font: { family: 'DM Sans', size: 11 } }, grid: { display: false } }
+      }
+    }
+  });
+
+  // isChart wrapper needs more height for many campaigns
+  document.querySelector('#isChart').closest('.chart-wrap').style.height = Math.max(240, searchCamps.length * 38 + 60) + 'px';
+}
+
+function renderKPIs() {
+  const grid = document.getElementById('kpiGrid');
+  if (!weeks.length) { grid.innerHTML = ''; return; }
+  const l = weeks[weeks.length-1];
+  const p = weeks.length > 1 ? weeks[weeks.length-2] : null;
+
+  function delta(cur, prev, key, prefix='', suffix='', invert=false) {
+    if (!prev) return '';
+    const pv = prev[key], cv = cur[key];
+    if (!pv) return '';
+    const pct = Math.round((cv-pv)/pv*100);
+    if (pct === 0) return '<span class="kpi-sub">no change</span>';
+    const up = invert ? pct < 0 : pct > 0;
+    return `<span class="kpi-sub ${up?'up':'down'}">${pct>0?'↑':'↓'} ${Math.abs(pct)}% vs prev</span>`;
+  }
+
+  const cpa = l.totalConv > 0 ? (l.totalSpend/l.totalConv).toFixed(2) : '—';
+
+  grid.innerHTML = `
+    <div class="kpi"><div class="kpi-label">Total clicks</div><div class="kpi-value">${l.totalClicks.toLocaleString()}</div>${delta(l,p,'totalClicks')}</div>
+    <div class="kpi"><div class="kpi-label">Total spend</div><div class="kpi-value">£${Math.round(l.totalSpend).toLocaleString()}</div>${delta(l,p,'totalSpend','£','',true)}</div>
+    <div class="kpi"><div class="kpi-label">Avg. CPC</div><div class="kpi-value">£${l.avgCPC.toFixed(2)}</div>${delta(l,p,'avgCPC','£','',true)}</div>
+    <div class="kpi"><div class="kpi-label">Conversions</div><div class="kpi-value">${l.totalConv.toFixed(1)}</div>${delta(l,p,'totalConv')}</div>
+    <div class="kpi"><div class="kpi-label">Cost / conv.</div><div class="kpi-value">${cpa === '—' ? '—' : '£'+cpa}</div></div>
+    <div class="kpi"><div class="kpi-label">Avg impr. share</div><div class="kpi-value">${Math.round(l.avgIS)}%</div>${delta(l,p,'avgIS')}</div>
+  `;
+}
+
+function renderAlerts() {
+  const box = document.getElementById('alerts');
+  if (weeks.length < 2) { box.innerHTML = ''; return; }
+  const l = weeks[weeks.length-1], p = weeks[weeks.length-2];
+  const alerts = [];
+
+  const clickDelta = p.totalClicks > 0 ? Math.round((l.totalClicks-p.totalClicks)/p.totalClicks*100) : 0;
+  if (clickDelta <= -20) alerts.push({type:'danger', text:`<strong>Significant click drop:</strong> Clicks fell from ${p.totalClicks.toLocaleString()} to ${l.totalClicks.toLocaleString()} (${clickDelta}%). Check for paused campaigns, budget caps, or impression share loss.`});
+  else if (clickDelta <= -10) alerts.push({type:'warn', text:`<strong>Click volume dip:</strong> Down ${Math.abs(clickDelta)}% week on week — worth monitoring.`});
+
+  const cpcDelta = p.avgCPC > 0 ? Math.round((l.avgCPC-p.avgCPC)/p.avgCPC*100) : 0;
+  if (cpcDelta >= 20) alerts.push({type:'danger', text:`<strong>CPC spike:</strong> Average CPC up ${cpcDelta}% to £${l.avgCPC.toFixed(2)}. Increased competition or bid strategy change likely.`});
+  else if (cpcDelta >= 10) alerts.push({type:'warn', text:`<strong>CPC rising:</strong> Up ${cpcDelta}% to £${l.avgCPC.toFixed(2)} — watch for budget compression.`});
+
+  const latest = weeks[weeks.length-1];
+  const highISLoss = latest.campaigns.filter(c => c.type === 'Search' && c.isLost > 60);
+  if (highISLoss.length > 0) alerts.push({type:'warn', text:`<strong>High impression share loss (rank):</strong> ${highISLoss.length} campaign${highISLoss.length>1?'s':''} losing >60% of available impressions due to ad rank — <em>${highISLoss.map(c=>c.name.split(' - ')[0]).join(', ')}</em>. Consider increasing bids or improving Quality Score.`});
+
+  const convDelta = p.totalConv > 0 ? Math.round((l.totalConv-p.totalConv)/p.totalConv*100) : 0;
+  if (convDelta >= 20) alerts.push({type:'ok', text:`<strong>Conversions up ${convDelta}%:</strong> ${l.totalConv.toFixed(1)} this week vs ${p.totalConv.toFixed(1)} last week.`});
+
+  const endedWithBudget = latest.campaigns.filter(c => c.status.toLowerCase().includes('ended') && c.budget > 0);
+  if (endedWithBudget.length >= 5) alerts.push({type:'warn', text:`<strong>${endedWithBudget.length} campaigns have ended</strong> but still carry budgets in the account — consider archiving or repurposing their budgets.`});
+
+  box.innerHTML = alerts.map(a => `<div class="alert alert-${a.type}">${a.text}</div>`).join('');
+}
+
+function renderTable() {
+  if (!weeks.length) return;
+  const latest = weeks[weeks.length-1];
+  const body = document.getElementById('campaignBody');
+  const sorted = [...latest.campaigns].sort((a,b) => b.clicks - a.clicks);
+
+  body.innerHTML = sorted.map(c => {
+    const convRate = c.clicks > 0 ? (c.conversions / c.clicks * 100) : 0;
+    return `
+    <tr class="campaign-row-clickable" onclick="openPanel('${c.name.replace(/'/g,"\\'")}')">
+      <td style="color:var(--text);max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${c.name}">${c.name}</td>
+      <td><span class="status-pill ${statusClass(c.status)}">${statusLabel(c.status)}</span></td>
+      <td class="num">£${c.budget.toLocaleString()}</td>
+      <td class="num">${c.impressions.toLocaleString()}</td>
+      <td class="num">${c.clicks.toLocaleString()}</td>
+      <td class="num">${c.ctr.toFixed(2)}%</td>
+      <td class="num">${c.conversions.toFixed(1)}</td>
+      <td class="num">${convRate > 0 ? convRate.toFixed(2)+'%' : '—'}</td>
+      <td class="num">£${c.cost.toFixed(2)}</td>
+      <td class="num">${c.cpc > 0 ? '£'+c.cpc.toFixed(2) : '—'}</td>
+      <td style="min-width:110px">
+        ${c.type === 'Search' && c.is > 0 ? `
+        <div class="is-bar">
+          <div class="is-track"><div class="is-fill" style="width:${c.is}%"></div></div>
+          <span class="is-num">${Math.round(c.is)}%</span>
+        </div>` : '<span style="color:var(--dim);font-size:11px">n/a</span>'}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderPills() {
+  const container = document.getElementById('weeksPills');
+  if (!weeks.length) {
+    container.innerHTML = '<span>Weeks loaded:</span><em style="font-size:12px;color:var(--dim);font-style:normal">None — upload a campaign report CSV to begin</em>';
+    return;
+  }
+  container.innerHTML = '<span>Weeks loaded:</span>' + weeks.map((w,i) => `
+    <span class="pill">${w.dateLabel} <button onclick="removeWeek(${i})" title="Remove">×</button></span>
+  `).join('');
+}
+
+function renderAll() {
+  const hasData = weeks.length > 0;
+  document.getElementById('emptyState').style.display = hasData ? 'none' : 'block';
+  document.getElementById('dashboard').style.display = hasData ? 'block' : 'none';
+  document.getElementById('clearBtn').style.display = hasData ? 'inline-flex' : 'none';
+  document.getElementById('lastUpdated').textContent = hasData ? `Last updated: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}` : '';
+  renderPills();
+  if (hasData) { renderKPIs(); renderAlerts(); renderCharts(); renderTable(); }
+}
+
+document.getElementById('fileInput').addEventListener('change', e => { handleFiles([...e.target.files]); e.target.value = ''; });
+
+function handleFiles(files) {
+  let loaded = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const parsed = parseCSV(e.target.result, file.name);
+      if (parsed) {
+        const exists = weeks.findIndex(w => w.dateLabel === parsed.dateLabel);
+        if (exists >= 0) weeks[exists] = parsed;
+        else weeks.push(parsed);
+        weeks.sort((a,b) => {
+          const da = new Date(a.dateLabel.split(' - ')[0]);
+          const db = new Date(b.dateLabel.split(' - ')[0]);
+          return da - db;
+        });
+      }
+      loaded++;
+      if (loaded === files.length) { saveState(); renderAll(); }
+    };
+    reader.readAsText(file, 'latin1');
+  });
+}
+
+function removeWeek(i) { weeks.splice(i,1); saveState(); renderAll(); }
+function clearAll() { if (!confirm('Remove all Google Ads data?')) return; weeks = []; saveState(); renderAll(); }
+
+const overlay = document.getElementById('dropOverlay');
+let dragCount = 0;
+document.addEventListener('dragenter', e => { e.preventDefault(); dragCount++; overlay.classList.add('active'); });
+document.addEventListener('dragleave', () => { dragCount--; if (dragCount<=0) { dragCount=0; overlay.classList.remove('active'); } });
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault(); dragCount=0; overlay.classList.remove('active');
+  const files = [...e.dataTransfer.files].filter(f=>f.name.endsWith('.csv'));
+  if (files.length) handleFiles(files);
+});
+
+function openPanel(campName) {
+  // Highlight active row
+  document.querySelectorAll('.campaign-row-clickable').forEach(r => r.classList.remove('active'));
+  document.querySelectorAll('.campaign-row-clickable').forEach(r => {
+    if (r.querySelector('td')?.title === campName || r.querySelector('td')?.textContent.trim() === campName.substring(0,30)) {
+      r.classList.add('active');
+    }
+  });
+
+  const panel = document.getElementById('campaignPanel');
+  const overlay = document.getElementById('panelOverlay');
+  document.getElementById('panelTitle').textContent = campName;
+
+  // Gather data for this campaign across all weeks
+  const campWeeks = weeks.map(w => {
+    const c = w.campaigns.find(c => c.name === campName);
+    return { label: w.dateLabel, data: c || null };
+  });
+
+  const hasData = campWeeks.some(w => w.data);
+  document.getElementById('panelSubtitle').textContent = hasData
+    ? `${campWeeks.filter(w=>w.data).length} week${campWeeks.filter(w=>w.data).length>1?'s':''} of data`
+    : 'No data found';
+
+  // Latest week data for KPIs
+  const latestEntry = [...campWeeks].reverse().find(w => w.data);
+  const prevEntry = latestEntry ? [...campWeeks].slice(0, campWeeks.indexOf(latestEntry)).reverse().find(w => w.data) : null;
+  const lc = latestEntry?.data;
+  const pc = prevEntry?.data;
+
+  function pctDelta(cur, prev, key) {
+    if (!prev || !prev[key]) return '';
+    const d = Math.round((cur[key]-prev[key])/prev[key]*100);
+    if (d===0) return '<span style="color:var(--muted)">—</span>';
+    return `<span style="color:${d>0?'var(--green)':'var(--red)'}">${d>0?'↑':'↓'}${Math.abs(d)}%</span>`;
+  }
+
+  const convRate = lc && lc.clicks > 0 ? (lc.conversions/lc.clicks*100).toFixed(2) : '—';
+  const cpa = lc && lc.conversions > 0 ? '£'+(lc.cost/lc.conversions).toFixed(2) : '—';
+
+  // Build panel body
+  let html = '';
+
+  if (lc) {
+    html += `<div class="panel-kpis">
+      <div class="panel-kpi"><div class="panel-kpi-label">Clicks</div><div class="panel-kpi-value">${lc.clicks.toLocaleString()}</div><div class="panel-kpi-sub">${pctDelta(lc,pc,'clicks')} vs prev</div></div>
+      <div class="panel-kpi"><div class="panel-kpi-label">Spend</div><div class="panel-kpi-value">£${Math.round(lc.cost).toLocaleString()}</div><div class="panel-kpi-sub">${pctDelta(lc,pc,'cost')} vs prev</div></div>
+      <div class="panel-kpi"><div class="panel-kpi-label">Conv. rate</div><div class="panel-kpi-value">${convRate}${convRate!=='—'?'%':''}</div><div class="panel-kpi-sub">${pc && pc.clicks > 0 ? pctDelta({v:lc.conversions/lc.clicks},{v:pc.conversions/pc.clicks},'v') : ''} vs prev</div></div>
+      <div class="panel-kpi"><div class="panel-kpi-label">Conversions</div><div class="panel-kpi-value">${lc.conversions.toFixed(1)}</div><div class="panel-kpi-sub">${pctDelta(lc,pc,'conversions')} vs prev</div></div>
+      <div class="panel-kpi"><div class="panel-kpi-label">CPA</div><div class="panel-kpi-value">${cpa}</div></div>
+      <div class="panel-kpi"><div class="panel-kpi-label">Impr. share</div><div class="panel-kpi-value">${lc.is > 0 ? Math.round(lc.is)+'%' : '—'}</div><div class="panel-kpi-sub">${lc.isLost > 0 ? Math.round(lc.isLost)+'% lost (rank)' : ''}</div></div>
+    </div>`;
+  }
+
+  // Week on week trend charts
+  if (campWeeks.filter(w=>w.data).length >= 1) {
+    html += `<div class="panel-section">Week on week trend</div>`;
+    html += `<div class="panel-chart-wrap" style="height:160px"><canvas id="panelClicksChart"></canvas></div>`;
+    html += `<div class="panel-chart-wrap" style="height:140px;margin-top:14px"><canvas id="panelConvChart"></canvas></div>`;
+    html += `<div class="panel-chart-wrap" style="height:140px;margin-top:14px"><canvas id="panelSpendChart"></canvas></div>`;
+  }
+
+  // vs other campaigns
+  const latestWeek = weeks[weeks.length-1];
+  if (latestWeek && latestWeek.campaigns.length > 1) {
+    html += `<div class="panel-section">vs other campaigns — latest week</div>`;
+    html += `<div id="vsSection"></div>`;
+  }
+
+  document.getElementById('panelBody').innerHTML = html;
+
+  // Render trend charts
+  const trendLabels = campWeeks.map(w => w.label.split(' ')[0]+' '+w.label.split(' ')[1]);
+  const clickData = campWeeks.map(w => w.data ? w.data.clicks : null);
+  const convData = campWeeks.map(w => w.data ? +(w.data.clicks > 0 ? (w.data.conversions/w.data.clicks*100).toFixed(2) : 0) : null);
+  const spendData = campWeeks.map(w => w.data ? +w.data.cost.toFixed(2) : null);
+
+  const PT = { color: '#555', font: { family: 'DM Mono', size: 10 } };
+  const PG = { color: 'rgba(255,255,255,0.04)' };
+  const baseOpts = { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false},tooltip:{backgroundColor:'#202026',titleColor:'#ccc',bodyColor:'#999'}}, scales:{ x:{ticks:PT,grid:{display:false}}, y:{ticks:PT,grid:PG,beginAtZero:true} } };
+
+  if (document.getElementById('panelClicksChart')) {
+    new Chart(document.getElementById('panelClicksChart'), { type:'bar', data:{ labels:trendLabels, datasets:[{data:clickData,backgroundColor:'#4a9eff',borderRadius:3,spanGaps:true}] }, options:{...baseOpts,plugins:{...baseOpts.plugins,tooltip:{...baseOpts.plugins.tooltip,callbacks:{title:i=>'Clicks: '+trendLabels[i[0].dataIndex]}}}} });
+  }
+  if (document.getElementById('panelConvChart')) {
+    new Chart(document.getElementById('panelConvChart'), { type:'line', data:{ labels:trendLabels, datasets:[{data:convData,borderColor:'#4ecb8b',backgroundColor:'rgba(78,203,139,0.07)',tension:0.35,pointRadius:4,fill:true,spanGaps:true}] }, options:{...baseOpts,scales:{...baseOpts.scales,y:{...baseOpts.scales.y,ticks:{...PT,callback:v=>v+'%'}}},plugins:{...baseOpts.plugins,tooltip:{...baseOpts.plugins.tooltip,callbacks:{label:i=>i.raw+'% conv rate'}}}} });
+  }
+  if (document.getElementById('panelSpendChart')) {
+    new Chart(document.getElementById('panelSpendChart'), { type:'bar', data:{ labels:trendLabels, datasets:[{data:spendData,backgroundColor:'#f5a623',borderRadius:3,spanGaps:true}] }, options:{...baseOpts,scales:{...baseOpts.scales,y:{...baseOpts.scales.y,ticks:{...PT,callback:v=>'£'+v}}}} });
+  }
+
+  // vs other campaigns bars
+  const vsSection = document.getElementById('vsSection');
+  if (vsSection && latestWeek) {
+    const allCamps = latestWeek.campaigns.filter(c => c.clicks > 0);
+    const maxClicks = Math.max(...allCamps.map(c=>c.clicks),1);
+    const maxConv = Math.max(...allCamps.map(c=>c.conversions),1);
+    const maxCost = Math.max(...allCamps.map(c=>c.cost),1);
+
+    const rows = allCamps.sort((a,b)=>b.clicks-a.clicks).map(c => {
+      const isSelected = c.name === campName;
+      const cr = c.clicks > 0 ? (c.conversions/c.clicks*100).toFixed(1) : '0';
+      return `<div class="vs-bar-row">
+        <span class="vs-name" style="${isSelected?'color:var(--blue);font-weight:500':''}" title="${c.name}">${c.name.length>32?c.name.substring(0,30)+'…':c.name}</span>
+        <div class="vs-bar-track" style="max-width:80px"><div class="vs-bar-fill" style="width:${Math.round(c.clicks/maxClicks*100)}%;background:${isSelected?'var(--blue)':'#2a3a4a'}"></div></div>
+        <span class="vs-val">${c.clicks}</span>
+        <span class="vs-val" style="color:${isSelected?'var(--green)':'var(--muted)'}">${cr}%</span>
+      </div>`;
+    }).join('');
+
+    vsSection.innerHTML = `<div class="vs-card"><div class="vs-label">Clicks &amp; conv. rate — all active campaigns</div>${rows}</div>`;
+  }
+
+  panel.classList.add('open');
+  overlay.classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('campaignPanel').classList.remove('open');
+  document.getElementById('panelOverlay').classList.remove('open');
+  document.querySelectorAll('.campaign-row-clickable').forEach(r => r.classList.remove('active'));
+}
+
+loadState();
+renderAll();
+</script>
+</body>
+</html>
