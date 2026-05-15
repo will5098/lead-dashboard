@@ -164,6 +164,17 @@
     <div class="alerts" id="alerts"></div>
     <div class="charts-grid">
       <div class="card chart-full">
+        <div class="card-title">Key events (conversions) — week on week trend</div>
+        <div class="legend">
+          <span class="legend-item"><span class="ldot" style="background:#4ecb8b"></span>Main site</span>
+          <span class="legend-item"><span class="ldot" style="background:#2dd4bf"></span>Landing page</span>
+          <span class="legend-item"><span class="ldot" style="background:#888780"></span>Total</span>
+        </div>
+        <div class="chart-wrap" style="height:200px"><canvas id="keyEventsTrendChart"></canvas></div>
+      </div>
+    </div>
+    <div class="charts-grid">
+      <div class="card chart-full">
         <div class="card-title">Sessions by channel group — week on week</div>
         <div class="legend" id="channelLegend"></div>
         <div class="chart-wrap" style="height:220px"><canvas id="channelChart"></canvas></div>
@@ -424,6 +435,36 @@ function renderCharts(){
       {label:'Landing page',data:weeks.map(w=>w.lpKeyEvents||0),backgroundColor:'#2dd4bf',stack:'s',borderRadius:2}
     ]},
     options:{...BASE,scales:{x:{...BASE.scales.x,stacked:true},y:{...BASE.scales.y,stacked:true}}}
+  });
+
+  // Key events trend — prominent top chart
+  dc('keyEventsTrendChart');
+  charts['keyEventsTrendChart'] = new Chart(document.getElementById('keyEventsTrendChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Main site',data:weeks.map(w=>w.mainKeyEvents||0),backgroundColor:'#4ecb8b',stack:'s',borderRadius:3},
+      {label:'Landing page',data:weeks.map(w=>w.lpKeyEvents||0),backgroundColor:'#2dd4bf',stack:'s',borderRadius:3},
+      {label:'Total',type:'line',data:weeks.map(w=>w.totalKeyEvents||0),
+        borderColor:'rgba(255,255,255,0.5)',backgroundColor:'transparent',
+        tension:.35,pointRadius:5,pointBackgroundColor:'#fff',borderWidth:2,stack:undefined}
+    ]},
+    options:{...BASE,
+      scales:{
+        x:{...BASE.scales.x,stacked:true},
+        y:{...BASE.scales.y,stacked:true,ticks:{...BASE.scales.y.ticks,stepSize:5}}
+      },
+      plugins:{...BASE.plugins,
+        tooltip:{...BASE.plugins.tooltip,
+          callbacks:{
+            afterBody: items => {
+              const w = weeks[items[0].dataIndex];
+              const rate = w.totalSessions > 0 ? (w.totalKeyEvents/w.totalSessions*100).toFixed(2) : 0;
+              return [\`Total: \${w.totalKeyEvents} events\`, \`Conv. rate: \${rate}%\`];
+            }
+          }
+        }
+      }
+    }
   });
 }
 
