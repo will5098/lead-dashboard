@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  :root {
+    --bg:#0f0f11;--surface:#18181c;--surface2:#202026;
+    --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
+    --text:#f0f0f0;--muted:#888;--dim:#555;
+    --blue:#4a9eff;--green:#4ecb8b;--green-dim:#1a3d2b;
+    --red:#ff5f5f;--red-dim:#3d1a1a;--amber:#f5a623;--amber-dim:#3d2a0a;
+    --purple:#9b7fff;--teal:#2dd4bf;--pink:#e06b8b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+  nav{padding:0 32px;border-bottom:1px solid var(--border);display:flex;align-items:stretch;height:44px}
+  .nav-link{display:flex;align-items:center;padding:0 16px;font-size:13px;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;transition:color .15s}
+  .nav-link:hover{color:var(--text)}
+  .nav-link.active{color:var(--blue);border-bottom-color:var(--blue)}
+  header{padding:24px 32px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .header-left h1{font-size:18px;font-weight:600;letter-spacing:-.02em}
+  .header-left p{font-size:12px;color:var(--muted);margin-top:3px}
+  .btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface2);color:var(--text);transition:background .15s}
+  .btn:hover{background:#2a2a32}
+  .btn-primary{background:var(--blue);border-color:var(--blue);color:#000;font-weight:600}
+  .btn-primary:hover{background:#6ab4ff}
+  .btn-danger{background:transparent;border-color:var(--red);color:var(--red)}
+  .btn-danger:hover{background:var(--red-dim)}
+  #fileInput{display:none}
+  .weeks-pills{display:flex;gap:6px;flex-wrap:wrap;padding:10px 32px;border-bottom:1px solid var(--border);align-items:center;min-height:44px}
+  .weeks-pills span{font-size:11px;color:var(--muted);margin-right:4px}
+  .pill{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);display:flex;align-items:center;gap:5px}
+  .pill button{background:none;border:none;color:var(--dim);cursor:pointer;font-size:13px;line-height:1;padding:0}
+  .pill button:hover{color:var(--red)}
+  main{padding:24px 32px;max-width:1100px}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:24px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .kpi-label{font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500;letter-spacing:.04em;text-transform:uppercase}
+  .kpi-value{font-size:24px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:-.03em}
+  .kpi-sub{font-size:11px;margin-top:4px;color:var(--muted)}
+  .kpi-sub.up{color:var(--green)}.kpi-sub.down{color:var(--red)}
+  .alerts{margin-bottom:20px;display:flex;flex-direction:column;gap:8px}
+  .alert{padding:10px 14px;border-radius:8px;font-size:12px;line-height:1.6;border-left:3px solid}
+  .alert-warn{background:var(--amber-dim);border-color:var(--amber);color:#d4a04a}
+  .alert-danger{background:var(--red-dim);border-color:var(--red);color:#e07070}
+  .alert-ok{background:var(--green-dim);border-color:var(--green);color:#50b87a}
+  .alert strong{font-weight:600}
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  .chart-full{grid-column:1/-1}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px}
+  .card-title{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+  .legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+  .ldot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+  .chart-wrap{position:relative;width:100%}
+  /* Source table */
+  .src-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+  .src-table th{text-align:left;padding:6px 10px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border)}
+  .src-table td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:middle}
+  .src-table tr:last-child td{border-bottom:none}
+  .src-table .num{font-family:'DM Mono',monospace;text-align:right}
+  .src-table tr.clickable{cursor:pointer}
+  .src-table tr.clickable:hover td{background:var(--surface2);color:var(--text)}
+  .src-table tr.clickable.active td{background:#1a2a3a;color:var(--text)}
+  .channel-badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500}
+  .ch-google-paid{background:#1a3a5c;color:#4a9eff}
+  .ch-google-organic{background:#1a3d2b;color:#4ecb8b}
+  .ch-social-paid{background:#3d1a2a;color:#e06b8b}
+  .ch-social-organic{background:#2a1a3a;color:#9b7fff}
+  .ch-direct{background:#2a2a2a;color:#888}
+  .ch-bing{background:#1a2a3a;color:#2dd4bf}
+  .ch-ai{background:#2a1a3a;color:#f5a623}
+  .ch-referral{background:#1a1a2a;color:#666}
+  .ch-other{background:#1a1a1a;color:#555}
+  .eng-bar{display:flex;align-items:center;gap:6px}
+  .eng-track{flex:1;height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;max-width:60px}
+  .eng-fill{height:100%;border-radius:3px;background:var(--blue)}
+  /* Panel */
+  .panel-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200}
+  .panel-overlay.open{display:block}
+  .panel{position:fixed;top:0;right:0;bottom:0;width:min(660px,95vw);background:var(--surface);border-left:1px solid var(--border2);z-index:201;transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;overflow:hidden}
+  .panel.open{transform:translateX(0)}
+  .panel-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-shrink:0}
+  .panel-title{font-size:15px;font-weight:600;letter-spacing:-.02em;line-height:1.3}
+  .panel-subtitle{font-size:12px;color:var(--muted);margin-top:3px}
+  .panel-close{background:none;border:1px solid var(--border2);color:var(--muted);cursor:pointer;border-radius:6px;padding:4px 10px;font-size:18px;line-height:1;flex-shrink:0;transition:background .15s}
+  .panel-close:hover{background:var(--surface2);color:var(--text)}
+  .panel-body{padding:20px 24px;overflow-y:auto;flex:1}
+  .panel-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px}
+  .panel-kpi{background:var(--surface2);border-radius:8px;padding:10px 12px}
+  .panel-kpi-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+  .panel-kpi-value{font-size:18px;font-weight:600;font-family:'DM Mono',monospace}
+  .panel-kpi-sub{font-size:11px;margin-top:2px;color:var(--muted)}
+  .panel-section{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:18px 0 10px}
+  .panel-chart-wrap{position:relative;width:100%}
+  .vs-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px}
+  .vs-bar-track{flex:0 0 80px;height:5px;background:var(--surface);border-radius:3px;overflow:hidden}
+  .vs-bar-fill{height:100%;border-radius:3px}
+  .vs-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+  .vs-val{font-family:'DM Mono',monospace;font-size:11px;min-width:44px;text-align:right}
+  .empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+  .empty-state h2{font-size:16px;font-weight:500;margin-bottom:8px;color:var(--text)}
+  .empty-state p{font-size:13px;line-height:1.6;max-width:420px;margin:0 auto 20px}
+  .drop-overlay{display:none;position:fixed;inset:0;background:rgba(74,158,255,0.08);border:3px dashed var(--blue);z-index:100;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:var(--blue)}
+  .drop-overlay.active{display:flex}
+  footer{padding:20px 32px;border-top:1px solid var(--border);font-size:11px;color:var(--dim);display:flex;justify-content:space-between;margin-top:32px}
+  @media(max-width:700px){header,main,.weeks-pills,nav,footer{padding-left:16px;padding-right:16px}.charts-grid{grid-template-columns:1fr}.chart-full{grid-column:1}}
+</style>
+</head>
+<body>
+
+<div class="drop-overlay" id="dropOverlay">Drop GA CSV to add a week</div>
+
+<div class="panel-overlay" id="panelOverlay" onclick="closePanel()"></div>
+<div class="panel" id="srcPanel">
+  <div class="panel-header">
+    <div>
+      <div class="panel-title" id="panelTitle">Source / medium</div>
+      <div class="panel-subtitle" id="panelSubtitle"></div>
+    </div>
+    <button class="panel-close" onclick="closePanel()">×</button>
+  </div>
+  <div class="panel-body" id="panelBody"></div>
+</div>
+
+<nav>
+  <a class="nav-link" href="index.html">Lead sources</a>
+  <a class="nav-link" href="google-ads.html">Google Ads</a>
+  <a class="nav-link active" href="analytics.html">Analytics</a>
+</nav>
+
+<header>
+  <div class="header-left">
+    <h1>Web analytics</h1>
+    <p>Session source / medium — upload weekly GA4 traffic acquisition exports</p>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <input type="file" id="fileInput" accept=".csv" multiple>
+    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">+ Upload GA CSV</button>
+    <button class="btn btn-danger" onclick="clearAll()" id="clearBtn" style="display:none">Clear all</button>
+  </div>
+</header>
+
+<div class="weeks-pills" id="weeksPills">
+  <span>Weeks loaded:</span>
+  <em style="font-size:12px;color:var(--dim);font-style:normal">None — upload a GA4 traffic acquisition CSV to begin</em>
+</div>
+
+<main>
+  <div class="empty-state" id="emptyState">
+    <h2>No data yet</h2>
+    <p>Export from GA4 → Reports → Acquisition → Traffic acquisition. Select "Session source / medium" as the dimension, then export as CSV. Upload one file per week.</p>
+    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">Upload CSV</button>
+    <p style="margin-top:14px;font-size:11px">GA4 exports include a 9-row header — the parser handles this automatically.</p>
+  </div>
+
+  <div id="dashboard" style="display:none">
+    <div class="kpi-grid" id="kpiGrid"></div>
+    <div class="alerts" id="alerts"></div>
+    <div class="charts-grid">
+      <div class="card chart-full">
+        <div class="card-title">Sessions by channel group — week on week</div>
+        <div class="legend" id="channelLegend"></div>
+        <div class="chart-wrap" style="height:220px"><canvas id="channelChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Key events (conversions) by channel</div>
+        <div class="chart-wrap" style="height:210px"><canvas id="convChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Engagement rate by channel — latest week</div>
+        <div class="chart-wrap" style="height:210px"><canvas id="engChart"></canvas></div>
+      </div>
+      <div class="card chart-full">
+        <div class="card-title">Total sessions trend</div>
+        <div class="chart-wrap" style="height:180px"><canvas id="totalChart"></canvas></div>
+      </div>
+      <div class="card chart-full">
+        <div class="card-title">Source / medium breakdown — click any row to explore</div>
+        <div style="overflow-x:auto">
+          <table class="src-table">
+            <thead>
+              <tr>
+                <th>Source / medium</th>
+                <th>Channel</th>
+                <th class="num">Sessions</th>
+                <th class="num">Engaged</th>
+                <th>Eng. rate</th>
+                <th class="num">Avg. time</th>
+                <th class="num">Key events</th>
+                <th class="num">Conv. rate</th>
+              </tr>
+            </thead>
+            <tbody id="srcBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>Analytics dashboard — internal use only</span>
+  <span id="lastUpdated"></span>
+</footer>
+
+<script>
+const STORAGE_KEY = 'ga_dashboard_v1';
+let weeks = [];
+
+function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(weeks))}catch(e){}}
+function loadState(){try{const s=localStorage.getItem(STORAGE_KEY);if(s)weeks=JSON.parse(s)}catch(e){weeks=[]}}
+
+// ── Junk referral filter ──────────────────────────────────────────────────────
+const JUNK_DOMAINS = /sudoku|salsajeans|carfax|cashnet|craftsy|dresslink|geekbuying|toms\.com|packers|parents\.com|distrokid|looper\.com|hellcase|guioteca|eltucumano|prensalibre|rawstory|scmp\.com|showmax|significados|simpleflying|salsajeans|pureinfotech|arriyadiyah|advisurf|rodalesorganiclife|probioticamerica|serpempire|shopperapproved|louderwithcrowder|mtbr\.com|monsterindia|iebschool|hollywoodlife|dupontregistry|detroitnews|designrush|creativebloq|dooray|aax\.amazon|storage\.googleapis|imasdk\.googleapis|googleads\.g\.double|ampproject/i;
+
+function isJunk(src){
+  return JUNK_DOMAINS.test(src) || (src.includes('referral') && !isKnownReferral(src));
+}
+
+function isKnownReferral(src){
+  return /linkedin|facebook|chatgpt|perplexity|bing|hubspot|dailymail|telegraph|independent|liverpoolecho|wordpress\.geobear|geobear|mail\.(google|yahoo)|compareukquotes|propertyinvestmentsuk|stone junction|istructe|engineers journal|statics\.teams|referral\/pr/i.test(src);
+}
+
+// ── Channel classification ────────────────────────────────────────────────────
+function classifyChannel(src){
+  const s = src.toLowerCase();
+  if(/google.*cpc|google.*paid/.test(s)) return 'Google Paid';
+  if(/google.*organic/.test(s)) return 'Google Organic';
+  if(/bing.*cpc|bing.*paid|an\s*\/\s*paid/.test(s)) return 'Bing / Microsoft';
+  if(/fb.*paid|facebook.*cpc|ig.*paid/.test(s)) return 'Social Paid';
+  if(/fb.*social|ig.*social|facebook.*organic|instagram/.test(s)) return 'Social Organic';
+  if(/linkedin/.test(s)) return 'LinkedIn';
+  if(/chatgpt|perplexity|copilot|ecosia/.test(s)) return 'AI Referral';
+  if(/direct.*none/.test(s)) return 'Direct';
+  if(/organic/.test(s)) return 'Organic (other)';
+  if(/email/.test(s)) return 'Email';
+  if(/referral/.test(s)) return 'Referral';
+  return 'Other';
+}
+
+const CHANNEL_COLORS = {
+  'Google Paid':'#4a9eff',
+  'Google Organic':'#4ecb8b',
+  'Bing / Microsoft':'#2dd4bf',
+  'Social Paid':'#e06b8b',
+  'Social Organic':'#9b7fff',
+  'LinkedIn':'#0ea5e9',
+  'AI Referral':'#f5a623',
+  'Direct':'#666',
+  'Organic (other)':'#3d8b6e',
+  'Email':'#c084fc',
+  'Referral':'#4a4a54',
+  'Other':'#333'
+};
+
+const CHANNEL_BADGE = {
+  'Google Paid':'ch-google-paid','Google Organic':'ch-google-organic',
+  'Social Paid':'ch-social-paid','Social Organic':'ch-social-organic',
+  'Bing / Microsoft':'ch-bing','LinkedIn':'ch-bing',
+  'AI Referral':'ch-ai','Direct':'ch-direct',
+  'Referral':'ch-referral','Email':'ch-referral','Organic (other)':'ch-other','Other':'ch-other'
+};
+
+// ── CSV parsing ───────────────────────────────────────────────────────────────
+function parseCSV(text, filename){
+  const lines = text.split('\n');
+  // Extract date from GA header
+  let startDate='', endDate='', dateLabel='';
+  for(const l of lines.slice(0,12)){
+    const m = l.match(/Start date:\s*(\d{8})/);
+    const m2 = l.match(/End date:\s*(\d{8})/);
+    if(m) startDate = m[1];
+    if(m2) endDate = m[2] || m2[1];
+  }
+  if(startDate){
+    const fmt = d => {
+      const y=d.slice(0,4),mo=d.slice(4,6),day=d.slice(6,8);
+      return new Date(y,mo-1,day).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    };
+    dateLabel = `${fmt(startDate)} – ${fmt(endDate||startDate)}`;
+  } else {
+    dateLabel = filename.replace('.csv','');
+  }
+
+  // Find header row (the one with 'Session source')
+  let headerIdx = lines.findIndex(l => l.includes('Session source'));
+  if(headerIdx < 0) headerIdx = 9;
+  const csvBody = lines.slice(headerIdx).join('\n');
+  const result = Papa.parse(csvBody, {header:true, skipEmptyLines:true});
+  const rows = result.data;
+
+  // Parse and classify
+  const sources = rows
+    .filter(r => r['Session source / medium'] && !r['Session source / medium'].startsWith('#'))
+    .map(r => ({
+      src: r['Session source / medium'].trim(),
+      sessions: +r['Sessions'] || 0,
+      engaged: +r['Engaged sessions'] || 0,
+      engRate: parseFloat(r['Engagement rate']) || 0,
+      avgTime: parseFloat(r['Average engagement time per session']) || 0,
+      eventsPerSession: parseFloat(r['Events per session']) || 0,
+      keyEvents: parseFloat(r['Key events']) || 0,
+      convRate: parseFloat(r['Session key event rate']) || 0,
+    }))
+    .filter(r => r.sessions > 0)
+    .map(r => ({...r, channel: classifyChannel(r.src), junk: isJunk(r.src)}));
+
+  // Aggregate by channel
+  const channelMap = {};
+  sources.filter(r=>!r.junk).forEach(r => {
+    if(!channelMap[r.channel]) channelMap[r.channel] = {sessions:0,engaged:0,keyEvents:0,engRate:0,n:0};
+    channelMap[r.channel].sessions += r.sessions;
+    channelMap[r.channel].engaged += r.engaged;
+    channelMap[r.channel].keyEvents += r.keyEvents;
+    channelMap[r.channel].engRate += r.engRate;
+    channelMap[r.channel].n++;
+  });
+  Object.values(channelMap).forEach(c => c.engRate = c.n > 0 ? c.engRate/c.n : 0);
+
+  const totalSessions = sources.filter(r=>!r.junk).reduce((a,r)=>a+r.sessions,0);
+  const totalEngaged = sources.filter(r=>!r.junk).reduce((a,r)=>a+r.engaged,0);
+  const totalKeyEvents = sources.filter(r=>!r.junk).reduce((a,r)=>a+r.keyEvents,0);
+  const overallEngRate = totalSessions > 0 ? totalEngaged/totalSessions : 0;
+
+  return {dateLabel, sources, channelMap, totalSessions, totalEngaged, totalKeyEvents, overallEngRate, filename};
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+let charts = {};
+function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+const TICK={color:'#666',font:{family:'DM Mono',size:11}};
+const GRID={color:'rgba(255,255,255,0.05)'};
+const BASE={responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{display:false},tooltip:{backgroundColor:'#202026',titleColor:'#ccc',bodyColor:'#999',borderColor:'rgba(255,255,255,0.1)',borderWidth:1}},
+  scales:{x:{ticks:{...TICK,autoSkip:false,maxRotation:0},grid:{display:false}},y:{ticks:TICK,grid:GRID,beginAtZero:true}}};
+
+function renderCharts(){
+  const labels = weeks.map(w=>w.dateLabel);
+  const n = weeks.length;
+  const allChannels = [...new Set(weeks.flatMap(w=>Object.keys(w.channelMap)))];
+  const mainChannels = ['Google Paid','Google Organic','Bing / Microsoft','Social Paid','Social Organic','AI Referral','Direct','Email','Referral'].filter(c=>allChannels.includes(c));
+
+  // Channel stacked bar
+  dc('channelChart');
+  charts['channelChart'] = new Chart(document.getElementById('channelChart'),{
+    type:'bar',
+    data:{labels,datasets:mainChannels.map(ch=>({
+      label:ch, data:weeks.map(w=>w.channelMap[ch]?.sessions||0),
+      backgroundColor:CHANNEL_COLORS[ch]||'#333', stack:'s'
+    }))},
+    options:{...BASE,scales:{x:{...BASE.scales.x,stacked:true},y:{...BASE.scales.y,stacked:true}},
+      plugins:{...BASE.plugins,legend:{display:false}}}
+  });
+
+  // Legend
+  const leg = document.getElementById('channelLegend');
+  leg.innerHTML = mainChannels.filter(ch=>weeks.some(w=>w.channelMap[ch]?.sessions>0)).map(ch=>
+    `<span class="legend-item"><span class="ldot" style="background:${CHANNEL_COLORS[ch]}"></span>${ch}</span>`
+  ).join('');
+
+  // Key events bar
+  dc('convChart');
+  const latest = weeks[weeks.length-1];
+  const convChannels = mainChannels.filter(ch=>weeks.some(w=>w.channelMap[ch]?.keyEvents>0));
+  charts['convChart'] = new Chart(document.getElementById('convChart'),{
+    type:'bar',
+    data:{labels,datasets:convChannels.map(ch=>({
+      label:ch, data:weeks.map(w=>w.channelMap[ch]?.keyEvents||0),
+      backgroundColor:CHANNEL_COLORS[ch]||'#333'
+    }))},
+    options:{...BASE,plugins:{...BASE.plugins,legend:{display:true,labels:{color:'#666',font:{size:10,family:'DM Sans'},boxWidth:8,boxHeight:8}}}}
+  });
+
+  // Engagement rate horizontal bar — latest week
+  dc('engChart');
+  const engChannels = mainChannels.filter(ch=>latest.channelMap[ch]?.sessions>0);
+  charts['engChart'] = new Chart(document.getElementById('engChart'),{
+    type:'bar',
+    data:{labels:engChannels,datasets:[{
+      data:engChannels.map(ch=>+(latest.channelMap[ch]?.engRate*100).toFixed(1)),
+      backgroundColor:engChannels.map(ch=>CHANNEL_COLORS[ch]||'#333'),
+      borderRadius:3
+    }]},
+    options:{...BASE,indexAxis:'y',
+      scales:{x:{ticks:{...TICK,callback:v=>v+'%'},grid:GRID,max:100},y:{ticks:{...TICK,font:{family:'DM Sans',size:11}},grid:{display:false}}}}
+  });
+
+  // Total sessions line
+  dc('totalChart');
+  charts['totalChart'] = new Chart(document.getElementById('totalChart'),{
+    type:'line',
+    data:{labels,datasets:[{
+      data:weeks.map(w=>w.totalSessions),
+      borderColor:'#4a9eff',backgroundColor:'rgba(74,158,255,0.07)',
+      tension:.35,pointRadius:5,fill:true
+    }]},
+    options:BASE
+  });
+}
+
+function renderKPIs(){
+  const grid = document.getElementById('kpiGrid');
+  if(!weeks.length){grid.innerHTML='';return;}
+  const l=weeks[weeks.length-1], p=weeks.length>1?weeks[weeks.length-2]:null;
+  function d(lv,pv){
+    if(pv==null||pv===0) return '';
+    const pct=Math.round((lv-pv)/pv*100);
+    if(pct===0) return '<span class="kpi-sub">no change</span>';
+    return `<span class="kpi-sub ${pct>0?'up':'down'}">${pct>0?'↑':'↓'}${Math.abs(pct)}% vs prev</span>`;
+  }
+  const er = (l.overallEngRate*100).toFixed(1);
+  const convRate = l.totalSessions>0?(l.totalKeyEvents/l.totalSessions*100).toFixed(2):0;
+  grid.innerHTML=`
+    <div class="kpi"><div class="kpi-label">Total sessions</div><div class="kpi-value">${l.totalSessions.toLocaleString()}</div>${d(l.totalSessions,p?.totalSessions)}</div>
+    <div class="kpi"><div class="kpi-label">Engaged sessions</div><div class="kpi-value">${l.totalEngaged.toLocaleString()}</div>${d(l.totalEngaged,p?.totalEngaged)}</div>
+    <div class="kpi"><div class="kpi-label">Engagement rate</div><div class="kpi-value">${er}%</div>${d(l.overallEngRate,p?.overallEngRate)}</div>
+    <div class="kpi"><div class="kpi-label">Key events</div><div class="kpi-value">${l.totalKeyEvents.toFixed(0)}</div>${d(l.totalKeyEvents,p?.totalKeyEvents)}</div>
+    <div class="kpi"><div class="kpi-label">Key event rate</div><div class="kpi-value">${convRate}%</div></div>
+    <div class="kpi"><div class="kpi-label">Google paid sessions</div><div class="kpi-value">${(weeks[weeks.length-1].channelMap['Google Paid']?.sessions||0).toLocaleString()}</div>${d(l.channelMap['Google Paid']?.sessions,p?.channelMap['Google Paid']?.sessions)}</div>
+  `;
+}
+
+function renderAlerts(){
+  const box = document.getElementById('alerts');
+  if(weeks.length<2){box.innerHTML='';return;}
+  const l=weeks[weeks.length-1],p=weeks[weeks.length-2];
+  const alerts=[];
+  const sd=p.totalSessions>0?Math.round((l.totalSessions-p.totalSessions)/p.totalSessions*100):0;
+  if(sd<=-20) alerts.push({t:'danger',m:`<strong>Session drop:</strong> Total sessions fell ${Math.abs(sd)}% week on week (${p.totalSessions.toLocaleString()} → ${l.totalSessions.toLocaleString()}). Check all channels for drops.`});
+  else if(sd<=-10) alerts.push({t:'warn',m:`<strong>Session dip:</strong> Down ${Math.abs(sd)}% vs last week — worth monitoring.`});
+  const gpd=p.channelMap['Google Paid']?.sessions;
+  const gpl=l.channelMap['Google Paid']?.sessions;
+  if(gpd&&gpl){const dd=Math.round((gpl-gpd)/gpd*100);if(dd<=-20)alerts.push({t:'danger',m:`<strong>Google Paid sessions down ${Math.abs(dd)}%:</strong> ${gpd} → ${gpl}. Cross-reference with Google Ads campaign data.`});}
+  const god=p.channelMap['Google Organic']?.sessions;
+  const gol=l.channelMap['Google Organic']?.sessions;
+  if(god&&gol){const dd=Math.round((gol-god)/god*100);if(dd<=-15)alerts.push({t:'warn',m:`<strong>Organic sessions down ${Math.abs(dd)}%:</strong> Could indicate a ranking drop — check Search Console.`});
+  else if(dd>=20)alerts.push({t:'ok',m:`<strong>Organic sessions up ${dd}%</strong> — strong SEO performance this week.`});}
+  const kd=p.totalKeyEvents,kl=l.totalKeyEvents;
+  if(kd>0){const dd=Math.round((kl-kd)/kd*100);if(dd<=-25)alerts.push({t:'danger',m:`<strong>Key events (conversions) dropped ${Math.abs(dd)}%:</strong> ${kd} → ${kl}. Check which channel drove the loss.`});
+  else if(dd>=25)alerts.push({t:'ok',m:`<strong>Key events up ${dd}%</strong> this week (${kd} → ${kl}).`});}
+  const ail=l.channelMap['AI Referral']?.sessions||0;
+  if(ail>=10) alerts.push({t:'ok',m:`<strong>AI referral traffic: ${ail} sessions</strong> from ChatGPT, Perplexity and similar. Growing channel worth tracking.`});
+  box.innerHTML=alerts.map(a=>`<div class="alert alert-${a.t}">${a.m}</div>`).join('');
+}
+
+function renderTable(){
+  if(!weeks.length) return;
+  const latest=weeks[weeks.length-1];
+  const prev=weeks.length>1?weeks[weeks.length-2]:null;
+  const body=document.getElementById('srcBody');
+  const rows=latest.sources.filter(r=>!r.junk).sort((a,b)=>b.sessions-a.sessions);
+  const fmt=s=>{const m=Math.floor(s/60),sec=Math.round(s%60);return m>0?`${m}m ${sec}s`:`${sec}s`};
+  body.innerHTML=rows.map(r=>{
+    const prevRow=prev?.sources.find(p=>p.src===r.src);
+    const sessDelta=prevRow?Math.round((r.sessions-prevRow.sessions)/prevRow.sessions*100):null;
+    const deltaStr=sessDelta!=null?`<span style="font-size:10px;color:${sessDelta>0?'var(--green)':sessDelta<0?'var(--red)':'var(--dim)'}">${sessDelta>0?'↑':'↓'}${Math.abs(sessDelta)}%</span>`:'';
+    const ch=r.channel;
+    const convRatePct=(r.convRate*100).toFixed(1);
+    return `<tr class="clickable" onclick="openPanel('${r.src.replace(/'/g,"\\'")}')">
+      <td style="color:var(--text);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.src}">${r.src}</td>
+      <td><span class="channel-badge ${CHANNEL_BADGE[ch]||'ch-other'}">${ch}</span></td>
+      <td class="num">${r.sessions.toLocaleString()} ${deltaStr}</td>
+      <td class="num">${r.engaged.toLocaleString()}</td>
+      <td>
+        <div class="eng-bar">
+          <div class="eng-track"><div class="eng-fill" style="width:${Math.round(r.engRate*100)}%"></div></div>
+          <span style="font-family:'DM Mono',monospace;font-size:11px">${Math.round(r.engRate*100)}%</span>
+        </div>
+      </td>
+      <td class="num">${fmt(r.avgTime)}</td>
+      <td class="num" style="color:${r.keyEvents>0?'var(--green)':'var(--muted)'}">${r.keyEvents>0?r.keyEvents.toFixed(0):'—'}</td>
+      <td class="num" style="color:${r.keyEvents>0?'var(--green)':'var(--muted)'}">${r.keyEvents>0?convRatePct+'%':'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function openPanel(srcName){
+  document.querySelectorAll('.src-table tr.clickable').forEach(r=>r.classList.remove('active'));
+  document.querySelectorAll('.src-table tr.clickable').forEach(r=>{
+    if(r.querySelector('td')?.title===srcName) r.classList.add('active');
+  });
+  document.getElementById('panelTitle').textContent=srcName;
+  const campWeeks=weeks.map(w=>({label:w.dateLabel,data:w.sources.find(s=>s.src===srcName)||null}));
+  document.getElementById('panelSubtitle').textContent=`${campWeeks.filter(w=>w.data).length} week(s) of data · ${classifyChannel(srcName)}`;
+  const lw=campWeeks.filter(w=>w.data).slice(-1)[0];
+  const pw=campWeeks.filter(w=>w.data).slice(-2,-1)[0];
+  const l=lw?.data,p=pw?.data;
+  function pctD(a,b,key){
+    if(!b||!b[key]) return '';
+    const d=Math.round((a[key]-b[key])/b[key]*100);
+    return d===0?'':`<span style="color:${d>0?'var(--green)':'var(--red)'}">${d>0?'↑':'↓'}${Math.abs(d)}%</span>`;
+  }
+  let html='';
+  if(l){
+    const fmt=s=>{const m=Math.floor(s/60),sec=Math.round(s%60);return m>0?`${m}m ${sec}s`:`${sec}s`};
+    html+=`<div class="panel-kpis">
+      <div class="panel-kpi"><div class="panel-kpi-label">Sessions</div><div class="panel-kpi-value">${l.sessions}</div><div class="panel-kpi-sub">${pctD(l,p,'sessions')} vs prev</div></div>
+      <div class="panel-kpi"><div class="panel-kpi-label">Engaged</div><div class="panel-kpi-value">${l.engaged}</div><div class="panel-kpi-sub">${pctD(l,p,'engaged')} vs prev</div></div>
+      <div class="panel-kpi"><div class="panel-kpi-label">Eng. rate</div><div class="panel-kpi-value">${Math.round(l.engRate*100)}%</div></div>
+      <div class="panel-kpi"><div class="panel-kpi-label">Avg. time</div><div class="panel-kpi-value">${fmt(l.avgTime)}</div></div>
+      <div class="panel-kpi"><div class="panel-kpi-label">Key events</div><div class="panel-kpi-value" style="color:${l.keyEvents>0?'var(--green)':'inherit'}">${l.keyEvents>0?l.keyEvents.toFixed(0):'0'}</div><div class="panel-kpi-sub">${pctD(l,p,'keyEvents')} vs prev</div></div>
+      <div class="panel-kpi"><div class="panel-kpi-label">Conv. rate</div><div class="panel-kpi-value">${l.keyEvents>0?(l.convRate*100).toFixed(2)+'%':'—'}</div></div>
+    </div>`;
+  }
+  const trendLabels=campWeeks.map(w=>w.label.split(' ')[0]+' '+w.label.split(' ')[1]);
+  html+=`<div class="panel-section">Week on week trend</div>`;
+  html+=`<div class="panel-chart-wrap" style="height:150px"><canvas id="pSessChart"></canvas></div>`;
+  html+=`<div class="panel-chart-wrap" style="height:130px;margin-top:14px"><canvas id="pEngChart"></canvas></div>`;
+  html+=`<div class="panel-section">vs other sources — latest week sessions</div>`;
+  html+=`<div id="vsDiv"></div>`;
+  document.getElementById('panelBody').innerHTML=html;
+  const PT={color:'#555',font:{family:'DM Mono',size:10}},PG={color:'rgba(255,255,255,0.04)'};
+  const bOpts={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#202026',titleColor:'#ccc',bodyColor:'#999'}},scales:{x:{ticks:PT,grid:{display:false}},y:{ticks:PT,grid:PG,beginAtZero:true}}};
+  new Chart(document.getElementById('pSessChart'),{type:'bar',data:{labels:trendLabels,datasets:[{data:campWeeks.map(w=>w.data?.sessions||null),backgroundColor:'#4a9eff',borderRadius:3,spanGaps:true}]},options:bOpts});
+  new Chart(document.getElementById('pEngChart'),{type:'line',data:{labels:trendLabels,datasets:[{data:campWeeks.map(w=>w.data?+(w.data.engRate*100).toFixed(1):null),borderColor:'#4ecb8b',backgroundColor:'rgba(78,203,139,0.07)',tension:.35,pointRadius:4,fill:true,spanGaps:true}]},options:{...bOpts,scales:{...bOpts.scales,y:{...bOpts.scales.y,ticks:{...PT,callback:v=>v+'%'}}}}});
+  // vs comparison
+  const latest=weeks[weeks.length-1];
+  const top=latest.sources.filter(r=>!r.junk).sort((a,b)=>b.sessions-a.sessions).slice(0,12);
+  const maxS=Math.max(...top.map(r=>r.sessions),1);
+  document.getElementById('vsDiv').innerHTML=top.map(r=>{
+    const isSel=r.src===srcName;
+    return `<div class="vs-bar-row">
+      <span class="vs-name" style="${isSel?'color:var(--blue);font-weight:500':''}" title="${r.src}">${r.src.length>36?r.src.slice(0,34)+'…':r.src}</span>
+      <div class="vs-bar-track"><div class="vs-bar-fill" style="width:${Math.round(r.sessions/maxS*100)}%;background:${isSel?'var(--blue)':'#2a3a4a'}"></div></div>
+      <span class="vs-val">${r.sessions}</span>
+      <span class="vs-val" style="color:${r.keyEvents>0?'var(--green)':'var(--dim)'}">${r.keyEvents>0?r.keyEvents.toFixed(0)+' ev':'—'}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('srcPanel').classList.add('open');
+  document.getElementById('panelOverlay').classList.add('open');
+}
+
+function closePanel(){
+  document.getElementById('srcPanel').classList.remove('open');
+  document.getElementById('panelOverlay').classList.remove('open');
+  document.querySelectorAll('.src-table tr.clickable').forEach(r=>r.classList.remove('active'));
+}
+
+function renderPills(){
+  const c=document.getElementById('weeksPills');
+  if(!weeks.length){c.innerHTML='<span>Weeks loaded:</span><em style="font-size:12px;color:var(--dim);font-style:normal">None — upload a GA4 CSV to begin</em>';return;}
+  c.innerHTML='<span>Weeks loaded:</span>'+weeks.map((w,i)=>`<span class="pill">${w.dateLabel} <button onclick="removeWeek(${i})">×</button></span>`).join('');
+}
+
+function renderAll(){
+  const has=weeks.length>0;
+  document.getElementById('emptyState').style.display=has?'none':'block';
+  document.getElementById('dashboard').style.display=has?'block':'none';
+  document.getElementById('clearBtn').style.display=has?'inline-flex':'none';
+  document.getElementById('lastUpdated').textContent=has?`Last updated: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}`:'' ;
+  renderPills();
+  if(has){renderKPIs();renderAlerts();renderCharts();renderTable();}
+}
+
+document.getElementById('fileInput').addEventListener('change',e=>{handleFiles([...e.target.files]);e.target.value='';});
+
+function handleFiles(files){
+  let loaded=0;
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const parsed=parseCSV(e.target.result,file.name);
+      if(parsed){
+        const idx=weeks.findIndex(w=>w.dateLabel===parsed.dateLabel);
+        if(idx>=0) weeks[idx]=parsed; else weeks.push(parsed);
+        weeks.sort((a,b)=>new Date(a.dateLabel.split(' ')[0]+' '+a.dateLabel.split(' ')[1])-new Date(b.dateLabel.split(' ')[0]+' '+b.dateLabel.split(' ')[1]));
+      }
+      loaded++;
+      if(loaded===files.length){saveState();renderAll();}
+    };
+    reader.readAsText(file,'utf-8');
+  });
+}
+
+function removeWeek(i){weeks.splice(i,1);saveState();renderAll();}
+function clearAll(){if(!confirm('Remove all analytics data?'))return;weeks=[];saveState();renderAll();}
+
+const overlay=document.getElementById('dropOverlay');
+let dc2=0;
+document.addEventListener('dragenter',e=>{e.preventDefault();dc2++;overlay.classList.add('active');});
+document.addEventListener('dragleave',()=>{dc2--;if(dc2<=0){dc2=0;overlay.classList.remove('active');}});
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',e=>{e.preventDefault();dc2=0;overlay.classList.remove('active');const files=[...e.dataTransfer.files].filter(f=>f.name.endsWith('.csv'));if(files.length)handleFiles(files);});
+
+loadState();
+renderAll();
+</script>
+</body>
+</html>
