@@ -249,7 +249,7 @@
 
 <nav style="padding:0 32px;border-bottom:1px solid var(--border);display:flex;gap:0;align-items:stretch;height:44px;">
   <a style="display:flex;align-items:center;padding:0 16px;font-size:13px;color:#4a9eff;text-decoration:none;border-bottom:2px solid #4a9eff;" href="index.html">Lead sources</a>
-  <a style="display:flex;align-items:center;padding:0 16px;font-size:13px;color:#888;text-decoration:none;border-bottom:2px solid transparent;" href="google-ads.html">Google Ads</a>
+  <a style="display:flex;align-items:center;padding:0 16px;font-size:13px;color:#888;text-decoration:none;border-bottom:2px solid transparent;" href="google-ads.html">Google Ads</a><a style="display:flex;align-items:center;padding:0 16px;font-size:13px;color:#888;text-decoration:none;border-bottom:2px solid transparent;" href="analytics.html">Analytics</a>
 </nav>
 
 <header>
@@ -738,7 +738,15 @@ document.addEventListener('drop', e => {
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
+const BAKED_WEEKS = [{"weekLabel":"13 Apr \u2013 19 Apr","total":91,"sources":{"Unknown":22,"Google / Baidu Ads":36,"Referral / Professional":10,"Google Ads (re-classified)":7,"Organic search":1,"Leadoo":12,"Social":3},"stages":{"Closed Lost":54,"Validate":13,"Evaluate":7,"Negotiate":11,"Delivery":3,"Qualify":3},"intents":{"Cracking":11,"Subsidence":9,"Underpinning":6},"googlePaid":43,"organic":1,"social":3,"unknown":22,"referral":10,"leadoo":12,"youtube":0,"closedLost":54,"googleReclass":7},{"weekLabel":"20 Apr \u2013 26 Apr","total":79,"sources":{"Google Ads (re-classified)":3,"Unknown":25,"Social":2,"Google / Baidu Ads":46,"Referral / Professional":2,"Organic search":1},"stages":{"Evaluate":6,"Closed Lost":59,"Validate":9,"Negotiate":4,"Delivery":1},"intents":{"Cracking":9,"Underpinning":2,"Subsidence":1},"googlePaid":49,"organic":1,"social":2,"unknown":25,"referral":2,"leadoo":0,"youtube":0,"closedLost":59,"googleReclass":3},{"weekLabel":"27 Apr \u2013 4 May","total":116,"sources":{"Unknown":36,"Google / Baidu Ads":53,"Organic search":8,"Referral / Professional":3,"Google Ads (re-classified)":11,"YouTube":3,"Social":2},"stages":{"Closed Lost":55,"Qualify":22,"Negotiate":15,"Validate":15,"Evaluate":8,"Delivery":1},"intents":{"Subsidence":5,"Underpinning":4,"Resin":1,"Cracking":9},"googlePaid":64,"organic":8,"social":2,"unknown":36,"referral":3,"leadoo":0,"youtube":3,"closedLost":55,"googleReclass":11},{"weekLabel":"4 May \u2013 9 May","total":89,"sources":{"Unknown":43,"Google / Baidu Ads":37,"Social":6,"Google Ads (re-classified)":1,"Referral / Professional":1,"Other":1},"stages":{"Evaluate":12,"Closed Lost":38,"Validate":5,"Negotiate":5,"Qualify":28,"nan":1},"intents":{"Cracking":9,"Subsidence":2},"googlePaid":38,"organic":0,"social":6,"unknown":43,"referral":1,"leadoo":0,"youtube":0,"closedLost":38,"googleReclass":1}];
 loadState();
+const existingLabels = weeks.map(w=>w.weekLabel);
+BAKED_WEEKS.forEach(w=>{ if(!existingLabels.includes(w.weekLabel)) weeks.unshift(w); });
+weeks.sort((a,b)=>{
+  const da=new Date(a.weekLabel.split(' – ')[0].split(' ').reverse().join(' '));
+  const db=new Date(b.weekLabel.split(' – ')[0].split(' ').reverse().join(' '));
+  return da-db;
+});
 renderAll();
 </script>
 </body>
