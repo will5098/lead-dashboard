@@ -35,6 +35,8 @@
   .weeks-pills{display:flex;gap:6px;flex-wrap:wrap;padding:10px 32px;border-bottom:1px solid var(--border);align-items:center;min-height:44px}
   .weeks-pills span{font-size:11px;color:var(--muted);margin-right:4px}
   .pill{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);display:flex;align-items:center;gap:5px}
+  .pill{cursor:pointer;transition:background .15s,border-color .15s}
+  .pill.selected{background:#1a3a5c;border-color:var(--blue);color:var(--blue)}
   .pill button{background:none;border:none;color:var(--dim);cursor:pointer;font-size:13px;line-height:1;padding:0}
   .pill button:hover{color:var(--red)}
   main{padding:24px 32px;max-width:1100px}
@@ -235,6 +237,7 @@
 <script>
 const STORAGE_KEY = 'ga_dashboard_v1';
 let weeks = [];
+let selectedWeekIdx = -1; // -1 = latest week
 
 function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(weeks))}catch(e){}}
 function loadState(){try{const s=localStorage.getItem(STORAGE_KEY);if(s)weeks=JSON.parse(s)}catch(e){weeks=[]}}
@@ -376,7 +379,8 @@ function renderCharts(){
     type:'bar',
     data:{labels,datasets:mainChannels.map(ch=>({
       label:ch, data:weeks.map(w=>w.channelMap[ch]?.sessions||0),
-      backgroundColor:CHANNEL_COLORS[ch]||'#333', stack:'s'
+      backgroundColor:CHANNEL_COLORS[ch]||'#333',
+      stack:'s'
     }))},
     options:{...BASE,scales:{x:{...BASE.scales.x,stacked:true},y:{...BASE.scales.y,stacked:true}},
       plugins:{...BASE.plugins,legend:{display:false}}}
@@ -390,7 +394,7 @@ function renderCharts(){
 
   // Key events bar
   dc('convChart');
-  const latest = weeks[weeks.length-1];
+  const latest = weeks[activeIdx];
   const convChannels = mainChannels.filter(ch=>weeks.some(w=>w.channelMap[ch]?.keyEvents>0));
   charts['convChart'] = new Chart(document.getElementById('convChart'),{
     type:'bar',
@@ -403,7 +407,7 @@ function renderCharts(){
 
   // Engagement rate horizontal bar — latest week
   dc('engChart');
-  const engChannels = mainChannels.filter(ch=>latest.channelMap[ch]?.sessions>0);
+  const engChannels = mainChannels.filter(ch=>latest?.channelMap[ch]?.sessions>0);
   charts['engChart'] = new Chart(document.getElementById('engChart'),{
     type:'bar',
     data:{labels:engChannels,datasets:[{
@@ -457,7 +461,8 @@ function renderCharts(){
 function renderKPIs(){
   const grid = document.getElementById('kpiGrid');
   if(!weeks.length){grid.innerHTML='';return;}
-  const l=weeks[weeks.length-1], p=weeks.length>1?weeks[weeks.length-2]:null;
+  const activeIdx = selectedWeekIdx === -1 ? weeks.length-1 : selectedWeekIdx;
+  const l=weeks[activeIdx], p=activeIdx>0?weeks[activeIdx-1]:null;
   function d(lv,pv){
     if(pv==null||pv===0) return '';
     const pct=Math.round((lv-pv)/pv*100);
@@ -481,7 +486,9 @@ function renderKPIs(){
 function renderAlerts(){
   const box = document.getElementById('alerts');
   if(weeks.length<2){box.innerHTML='';return;}
-  const l=weeks[weeks.length-1],p=weeks[weeks.length-2];
+  const activeIdx = selectedWeekIdx === -1 ? weeks.length-1 : selectedWeekIdx;
+  if(activeIdx===0){box.innerHTML='';return;}
+  const l=weeks[activeIdx],p=weeks[activeIdx-1];
   const alerts=[];
   const sd=p.totalSessions>0?Math.round((l.totalSessions-p.totalSessions)/p.totalSessions*100):0;
   if(sd<=-20) alerts.push({t:'danger',m:`<strong>Session drop:</strong> Total sessions fell ${Math.abs(sd)}% week on week (${p.totalSessions.toLocaleString()} → ${l.totalSessions.toLocaleString()}). Check all channels for drops.`});
@@ -503,8 +510,9 @@ function renderAlerts(){
 
 function renderTable(){
   if(!weeks.length) return;
-  const latest=weeks[weeks.length-1];
-  const prev=weeks.length>1?weeks[weeks.length-2]:null;
+  const activeIdx = selectedWeekIdx === -1 ? weeks.length-1 : selectedWeekIdx;
+  const latest=weeks[activeIdx];
+  const prev=activeIdx>0?weeks[activeIdx-1]:null;
   const body=document.getElementById('srcBody');
   const rows=latest.sources.filter(r=>!r.junk).sort((a,b)=>b.sessions-a.sessions);
   const fmt=s=>{const m=Math.floor(s/60),sec=Math.round(s%60);return m>0?`${m}m ${sec}s`:`${sec}s`};
@@ -533,14 +541,15 @@ function renderTable(){
   }).join('');
 }
 
-function openPanel(srcName){
+function openPanel(srcName, propName){
   document.querySelectorAll('.src-table tr.clickable').forEach(r=>r.classList.remove('active'));
   document.querySelectorAll('.src-table tr.clickable').forEach(r=>{
-    if(r.querySelector('td')?.title===srcName) r.classList.add('active');
+    const tds = r.querySelectorAll('td');
+    if(tds[0]?.title===srcName && (tds[1]?.textContent.trim()||'Main site')===(propName||'Main site')) r.classList.add('active');
   });
   document.getElementById('panelTitle').textContent=srcName;
-  const campWeeks=weeks.map(w=>({label:w.dateLabel,data:w.sources.find(s=>s.src===srcName)||null}));
-  document.getElementById('panelSubtitle').textContent=`${campWeeks.filter(w=>w.data).length} week(s) of data · ${classifyChannel(srcName)}`;
+  const campWeeks=weeks.map(w=>({label:w.dateLabel,data:w.sources.find(s=>s.src===srcName && (s.property||'Main site')===(propName||'Main site'))||null}));
+  document.getElementById('panelSubtitle').textContent=`${campWeeks.filter(w=>w.data).length} week(s) of data · ${propName||'Main site'} · ${classifyChannel(srcName)}`;
   const lw=campWeeks.filter(w=>w.data).slice(-1)[0];
   const pw=campWeeks.filter(w=>w.data).slice(-2,-1)[0];
   const l=lw?.data,p=pw?.data;
@@ -596,9 +605,21 @@ function closePanel(){
 }
 
 function renderPills(){
-  const c=document.getElementById('weeksPills');
-  if(!weeks.length){c.innerHTML='<span>Weeks loaded:</span><em style="font-size:12px;color:var(--dim);font-style:normal">None — upload a GA4 CSV to begin</em>';return;}
-  c.innerHTML='<span>Weeks loaded:</span>'+weeks.map((w,i)=>`<span class="pill">${w.dateLabel} <button onclick="removeWeek(${i})">×</button></span>`).join('');
+  const container=document.getElementById('weeksPills');
+  if(!weeks.length){container.innerHTML='<span>Weeks loaded:</span><em style="font-size:12px;color:var(--dim);font-style:normal">None — upload a GA4 CSV to begin</em>';return;}
+  const active = selectedWeekIdx === -1 ? weeks.length-1 : selectedWeekIdx;
+  container.innerHTML='<span>Weeks loaded:</span>'+weeks.map((w,i)=>`
+    <span class="pill ${i===active?'selected':''}" onclick="selectWeek(${i})">${w.dateLabel}
+      <button onclick="event.stopPropagation();removeWeek(${i})">×</button>
+    </span>`).join('');
+}
+
+function selectWeek(idx){
+  selectedWeekIdx = idx;
+  renderPills();
+  renderKPIs();
+  renderAlerts();
+  renderTable();
 }
 
 function renderAll(){
