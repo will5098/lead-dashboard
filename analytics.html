@@ -237,7 +237,7 @@
 <script>
 const STORAGE_KEY = 'ga_dashboard_v1';
 let weeks = [];
-let selectedWeekIdx = -1; // -1 = latest week
+let selectedWeekIdx = -1;
 
 function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(weeks))}catch(e){}}
 function loadState(){try{const s=localStorage.getItem(STORAGE_KEY);if(s)weeks=JSON.parse(s)}catch(e){weeks=[]}}
@@ -368,6 +368,7 @@ const BASE={responsive:true,maintainAspectRatio:false,
   scales:{x:{ticks:{...TICK,autoSkip:false,maxRotation:0},grid:{display:false}},y:{ticks:TICK,grid:GRID,beginAtZero:true}}};
 
 function renderCharts(){
+  const activeIdx=selectedWeekIdx===-1?weeks.length-1:selectedWeekIdx;
   const labels = weeks.map(w=>w.dateLabel);
   const n = weeks.length;
   const allChannels = [...new Set(weeks.flatMap(w=>Object.keys(w.channelMap)))];
@@ -379,8 +380,7 @@ function renderCharts(){
     type:'bar',
     data:{labels,datasets:mainChannels.map(ch=>({
       label:ch, data:weeks.map(w=>w.channelMap[ch]?.sessions||0),
-      backgroundColor:CHANNEL_COLORS[ch]||'#333',
-      stack:'s'
+      backgroundColor:CHANNEL_COLORS[ch]||'#333', stack:'s'
     }))},
     options:{...BASE,scales:{x:{...BASE.scales.x,stacked:true},y:{...BASE.scales.y,stacked:true}},
       plugins:{...BASE.plugins,legend:{display:false}}}
@@ -440,29 +440,23 @@ function renderCharts(){
     options:{...BASE,scales:{x:{...BASE.scales.x,stacked:true},y:{...BASE.scales.y,stacked:true}}}
   });
 
-  // Key events trend — top chart
   dc('keyEventsTrendChart');
-  charts['keyEventsTrendChart'] = new Chart(document.getElementById('keyEventsTrendChart'),{
+  charts['keyEventsTrendChart']=new Chart(document.getElementById('keyEventsTrendChart'),{
     type:'bar',
     data:{labels,datasets:[
       {label:'Main site',data:weeks.map(w=>w.mainKeyEvents||0),backgroundColor:'#4ecb8b',stack:'s',borderRadius:3},
       {label:'Landing page',data:weeks.map(w=>w.lpKeyEvents||0),backgroundColor:'#2dd4bf',stack:'s',borderRadius:3},
-      {label:'Total',type:'line',data:weeks.map(w=>w.totalKeyEvents||0),
-        borderColor:'rgba(255,255,255,0.5)',backgroundColor:'transparent',
-        tension:.35,pointRadius:5,pointBackgroundColor:'#fff',borderWidth:2,stack:undefined}
+      {label:'Total',type:'line',data:weeks.map(w=>w.totalKeyEvents||0),borderColor:'rgba(255,255,255,0.5)',backgroundColor:'transparent',tension:.35,pointRadius:5,pointBackgroundColor:'#fff',borderWidth:2,stack:undefined}
     ]},
-    options:{...BASE,
-      scales:{x:{...BASE.scales.x,stacked:true},y:{...BASE.scales.y,stacked:true,ticks:{...BASE.scales.y.ticks,stepSize:5}}},
-      plugins:{...BASE.plugins}
-    }
+    options:{...BASE,scales:{x:{...BASE.scales.x,stacked:true},y:{...BASE.scales.y,stacked:true,ticks:{...BASE.scales.y.ticks,stepSize:5}}}}
   });
 }
 
 function renderKPIs(){
   const grid = document.getElementById('kpiGrid');
   if(!weeks.length){grid.innerHTML='';return;}
-  const activeIdx = selectedWeekIdx === -1 ? weeks.length-1 : selectedWeekIdx;
-  const l=weeks[activeIdx], p=activeIdx>0?weeks[activeIdx-1]:null;
+  const ai=selectedWeekIdx===-1?weeks.length-1:selectedWeekIdx;
+  const l=weeks[ai], p=ai>0?weeks[ai-1]:null;
   function d(lv,pv){
     if(pv==null||pv===0) return '';
     const pct=Math.round((lv-pv)/pv*100);
@@ -486,9 +480,9 @@ function renderKPIs(){
 function renderAlerts(){
   const box = document.getElementById('alerts');
   if(weeks.length<2){box.innerHTML='';return;}
-  const activeIdx = selectedWeekIdx === -1 ? weeks.length-1 : selectedWeekIdx;
-  if(activeIdx===0){box.innerHTML='';return;}
-  const l=weeks[activeIdx],p=weeks[activeIdx-1];
+  const ai=selectedWeekIdx===-1?weeks.length-1:selectedWeekIdx;
+  if(ai===0){box.innerHTML='';return;}
+  const l=weeks[ai],p=weeks[ai-1];
   const alerts=[];
   const sd=p.totalSessions>0?Math.round((l.totalSessions-p.totalSessions)/p.totalSessions*100):0;
   if(sd<=-20) alerts.push({t:'danger',m:`<strong>Session drop:</strong> Total sessions fell ${Math.abs(sd)}% week on week (${p.totalSessions.toLocaleString()} → ${l.totalSessions.toLocaleString()}). Check all channels for drops.`});
@@ -510,9 +504,9 @@ function renderAlerts(){
 
 function renderTable(){
   if(!weeks.length) return;
-  const activeIdx = selectedWeekIdx === -1 ? weeks.length-1 : selectedWeekIdx;
-  const latest=weeks[activeIdx];
-  const prev=activeIdx>0?weeks[activeIdx-1]:null;
+  const ai=selectedWeekIdx===-1?weeks.length-1:selectedWeekIdx;
+  const latest=weeks[ai];
+  const prev=ai>0?weeks[ai-1]:null;
   const body=document.getElementById('srcBody');
   const rows=latest.sources.filter(r=>!r.junk).sort((a,b)=>b.sessions-a.sessions);
   const fmt=s=>{const m=Math.floor(s/60),sec=Math.round(s%60);return m>0?`${m}m ${sec}s`:`${sec}s`};
@@ -541,14 +535,14 @@ function renderTable(){
   }).join('');
 }
 
-function openPanel(srcName, propName){
+function openPanel(srcName,propName){
   document.querySelectorAll('.src-table tr.clickable').forEach(r=>r.classList.remove('active'));
   document.querySelectorAll('.src-table tr.clickable').forEach(r=>{
-    const tds = r.querySelectorAll('td');
-    if(tds[0]?.title===srcName && (tds[1]?.textContent.trim()||'Main site')===(propName||'Main site')) r.classList.add('active');
+    const tds=r.querySelectorAll('td');
+    if(tds[0]?.title===srcName&&(tds[1]?.textContent.trim()||'Main site')===(propName||'Main site')) r.classList.add('active');
   });
   document.getElementById('panelTitle').textContent=srcName;
-  const campWeeks=weeks.map(w=>({label:w.dateLabel,data:w.sources.find(s=>s.src===srcName && (s.property||'Main site')===(propName||'Main site'))||null}));
+  const campWeeks=weeks.map(w=>({label:w.dateLabel,data:w.sources.find(s=>s.src===srcName&&(s.property||'Main site')===(propName||'Main site'))||null}));
   document.getElementById('panelSubtitle').textContent=`${campWeeks.filter(w=>w.data).length} week(s) of data · ${propName||'Main site'} · ${classifyChannel(srcName)}`;
   const lw=campWeeks.filter(w=>w.data).slice(-1)[0];
   const pw=campWeeks.filter(w=>w.data).slice(-2,-1)[0];
@@ -607,11 +601,8 @@ function closePanel(){
 function renderPills(){
   const container=document.getElementById('weeksPills');
   if(!weeks.length){container.innerHTML='<span>Weeks loaded:</span><em style="font-size:12px;color:var(--dim);font-style:normal">None — upload a GA4 CSV to begin</em>';return;}
-  const active = selectedWeekIdx === -1 ? weeks.length-1 : selectedWeekIdx;
-  container.innerHTML='<span>Weeks loaded:</span>'+weeks.map((w,i)=>`
-    <span class="pill ${i===active?'selected':''}" onclick="selectWeek(${i})">${w.dateLabel}
-      <button onclick="event.stopPropagation();removeWeek(${i})">×</button>
-    </span>`).join('');
+  const active = selectedWeekIdx===-1 ? weeks.length-1 : selectedWeekIdx;
+  container.innerHTML='<span>Weeks loaded:</span>'+weeks.map((w,i)=>`<span class="pill ${i===active?'selected':''}" onclick="selectWeek(${i})">${w.dateLabel} <button onclick="event.stopPropagation();removeWeek(${i})">×</button></span>`).join('');
 }
 
 function selectWeek(idx){
