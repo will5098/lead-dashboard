@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lead Source Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0f0f11;
+    --surface: #18181c;
+    --surface2: #202026;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0f0f0;
+    --muted: #888;
+    --dim: #555;
+    --blue: #4a9eff;
+    --blue-dim: #1a3a5c;
+    --blue-soft: #85B7EB;
+    --green: #4ecb8b;
+    --green-dim: #1a3d2b;
+    --red: #ff5f5f;
+    --red-dim: #3d1a1a;
+    --amber: #f5a623;
+    --amber-dim: #3d2a0a;
+    --purple: #9b7fff;
+    --pink: #e06b8b;
+    --teal: #2dd4bf;
+    --gray-bar: #4a4a54;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  header {
+    padding: 28px 32px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .header-left h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .header-left p {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .upload-zone {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text);
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn:hover { background: #2a2a32; border-color: rgba(255,255,255,0.2); }
+  .btn-primary { background: var(--blue); border-color: var(--blue); color: #000; font-weight: 600; }
+  .btn-primary:hover { background: #6ab4ff; border-color: #6ab4ff; }
+  .btn-danger { background: transparent; border-color: var(--red); color: var(--red); }
+  .btn-danger:hover { background: var(--red-dim); }
+
+  #fileInput { display: none; }
+
+  .weeks-pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 12px 32px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    min-height: 48px;
+  }
+  .weeks-pills span { font-size: 11px; color: var(--muted); margin-right: 4px; }
+  .pill {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .pill button {
+    background: none; border: none; color: var(--dim); cursor: pointer;
+    font-size: 13px; line-height: 1; padding: 0; margin-left: 2px;
+  }
+  .pill button:hover { color: var(--red); }
+
+  main { padding: 24px 32px; max-width: 1100px; }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .kpi-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+  .kpi-value { font-size: 28px; font-weight: 600; font-family: 'DM Mono', monospace; letter-spacing: -0.03em; color: var(--text); }
+  .kpi-sub { font-size: 11px; margin-top: 4px; color: var(--muted); }
+  .kpi-sub.up { color: var(--green); }
+  .kpi-sub.down { color: var(--red); }
+
+  .alerts { margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px; }
+
+  .alert {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    border-left: 3px solid;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .alert-warn { background: var(--amber-dim); border-color: var(--amber); color: #d4a04a; }
+  .alert-danger { background: var(--red-dim); border-color: var(--red); color: #e07070; }
+  .alert-ok { background: var(--green-dim); border-color: var(--green); color: #50b87a; }
+  .alert strong { font-weight: 600; }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .chart-full { grid-column: 1 / -1; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+
+  .card-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .ldot { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+
+  .chart-wrap { position: relative; width: 100%; }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .empty-state h2 { font-size: 16px; font-weight: 500; margin-bottom: 8px; color: var(--text); }
+  .empty-state p { font-size: 13px; line-height: 1.6; max-width: 400px; margin: 0 auto 20px; }
+
+  .drop-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(74,158,255,0.08);
+    border: 3px dashed var(--blue);
+    border-radius: 0;
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--blue);
+  }
+  .drop-overlay.active { display: flex; }
+
+  footer {
+    padding: 20px 32px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--dim);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 32px;
+  }
+
+  @media (max-width: 700px) {
+    header, main, .weeks-pills, footer { padding-left: 16px; padding-right: 16px; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .chart-full { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="drop-overlay" id="dropOverlay">Drop CSV files to add weeks</div>
+
+<header>
+  <div class="header-left">
+    <h1>Lead source dashboard</h1>
+    <p>Cumulative weekly view — all uploaded weeks</p>
+  </div>
+  <div class="upload-zone">
+    <input type="file" id="fileInput" accept=".csv" multiple>
+    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+      + Upload week CSV
+    </button>
+    <button class="btn btn-danger" onclick="clearAllData()" id="clearBtn" style="display:none">
+      Clear all
+    </button>
+  </div>
+</header>
+
+<div class="weeks-pills" id="weeksPills">
+  <span>Weeks loaded:</span>
+  <em style="font-size:12px;color:var(--dim);font-style:normal">None — upload a CSV to begin</em>
+</div>
+
+<main id="main">
+  <div class="empty-state" id="emptyState">
+    <h2>No data yet</h2>
+    <p>Upload your weekly CRM export CSV files using the button above. You can upload multiple files at once, or add them one week at a time.</p>
+    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">Upload CSV files</button>
+    <p style="margin-top:16px;font-size:11px">Files are processed in your browser — nothing is sent to any server.</p>
+  </div>
+  <div id="dashboard" style="display:none">
+    <div class="kpi-grid" id="kpiGrid"></div>
+    <div class="alerts" id="alerts"></div>
+    <div class="charts-grid">
+      <div class="card chart-full">
+        <div class="card-title">New opportunities by week</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="totalChart" role="img" aria-label="Total opportunities per week"></canvas></div>
+      </div>
+      <div class="card chart-full">
+        <div class="card-title">Lead source by week — after comment re-classification</div>
+        <div class="legend" id="sourceLegend"></div>
+        <div class="chart-wrap" style="height:220px"><canvas id="stackedChart" role="img" aria-label="Lead sources stacked by week"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Google paid vs organic vs social</div>
+        <div class="legend">
+          <span class="legend-item"><span class="ldot" style="background:#4a9eff"></span>Google paid</span>
+          <span class="legend-item"><span class="ldot" style="background:#4ecb8b"></span>Organic</span>
+          <span class="legend-item"><span class="ldot" style="background:#e06b8b"></span>Social</span>
+        </div>
+        <div class="chart-wrap" style="height:200px"><canvas id="channelChart" role="img" aria-label="Channel trends week on week"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Search intent themes</div>
+        <div class="legend">
+          <span class="legend-item"><span class="ldot" style="background:#e06b8b"></span>Cracking</span>
+          <span class="legend-item"><span class="ldot" style="background:#4a9eff"></span>Subsidence</span>
+          <span class="legend-item"><span class="ldot" style="background:#9b7fff"></span>Underpinning</span>
+          <span class="legend-item"><span class="ldot" style="background:#4ecb8b"></span>Other</span>
+        </div>
+        <div class="chart-wrap" style="height:200px"><canvas id="intentChart" role="img" aria-label="Search intent by week"></canvas></div>
+      </div>
+      <div class="card chart-full">
+        <div class="card-title">Active pipeline stages (excl. closed lost)</div>
+        <div class="legend">
+          <span class="legend-item"><span class="ldot" style="background:#1a5fa5"></span>Validate</span>
+          <span class="legend-item"><span class="ldot" style="background:#4a9eff"></span>Qualify</span>
+          <span class="legend-item"><span class="ldot" style="background:#85B7EB"></span>Evaluate</span>
+          <span class="legend-item"><span class="ldot" style="background:#4ecb8b"></span>Negotiate</span>
+          <span class="legend-item"><span class="ldot" style="background:#2dd4bf"></span>Delivery</span>
+        </div>
+        <div class="chart-wrap" style="height:210px"><canvas id="pipelineChart" role="img" aria-label="Pipeline stages by week"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Closed lost by week</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="lostChart" role="img" aria-label="Closed lost per week"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Unknown source rate</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="unknownChart" role="img" aria-label="Percentage of leads with unknown source"></canvas></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>Lead source dashboard — internal use only</span>
+  <span id="lastUpdated"></span>
+</footer>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'lead_dashboard_v2';
+let weeks = [];
+
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(weeks)); } catch(e) {}
+}
+function loadState() {
+  try {
+    const s = localStorage.getItem(STORAGE_KEY);
+    if (s) weeks = JSON.parse(s);
+  } catch(e) { weeks = []; }
+}
+
+// ─── Source classification ────────────────────────────────────────────────────
+function classifySource(leadSource, comment) {
+  const src = (leadSource || '').toLowerCase();
+  const com = (comment || '').toLowerCase();
+  if (/surveyor|struc engineer|struct|s\/e|thomasons|cousin|roofer|referred|recommended by/i.test(com)) return 'Referral / Professional';
+  if (/youtube/i.test(com)) return 'YouTube';
+  if (/facebook reel|instagram/i.test(com)) return 'Social';
+  if (/leadoo/i.test(com)) return 'Leadoo';
+  if (/facebook/i.test(src)) return 'Social';
+  if (/youtube/i.test(src)) return 'YouTube';
+  if (/google/i.test(com) && /didn/i.test(src)) return 'Google Ads (re-classified)';
+  if (/google|baidu/i.test(src)) return 'Google / Baidu Ads';
+  if (/organic/i.test(src)) return 'Organic search';
+  if (/existing|referral/i.test(src)) return 'Referral / Professional';
+  if (/didn/i.test(src)) return 'Unknown';
+  return 'Other';
+}
+
+function getIntent(comment) {
+  const c = (comment || '').toLowerCase();
+  if (/crack/i.test(c)) return 'Cracking';
+  if (/underpin|house pin/i.test(c)) return 'Underpinning';
+  if (/subsid|subsidence/i.test(c)) return 'Subsidence';
+  if (/heave/i.test(c)) return 'Heave';
+  if (/resin/i.test(c)) return 'Resin';
+  if (/landslip/i.test(c)) return 'Landslip';
+  return null;
+}
+
+// ─── CSV parsing ──────────────────────────────────────────────────────────────
+function parseCSV(csvText, filename) {
+  const result = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+  const rows = result.data;
+  if (!rows.length) return null;
+
+  // Detect date range
+  const dates = rows.map(r => {
+    const d = r['Contact Date'] || r['Created Date'] || '';
+    const parts = d.split('/');
+    if (parts.length === 3) return new Date(parts[2], parts[1]-1, parts[0]);
+    return null;
+  }).filter(Boolean);
+
+  const minDate = dates.length ? new Date(Math.min(...dates)) : null;
+  const maxDate = dates.length ? new Date(Math.max(...dates)) : null;
+
+  const fmt = d => d ? d.toLocaleDateString('en-GB', {day:'numeric',month:'short'}) : '?';
+  const weekLabel = minDate ? `${fmt(minDate)} – ${fmt(maxDate)}` : filename.replace('.csv','');
+
+  // Aggregate
+  const sources = {};
+  const stages = {};
+  const intents = {};
+  let googlePaid = 0, organic = 0, social = 0, unknown = 0, referral = 0, leadoo = 0, youtube = 0, googleReclass = 0;
+  let closedLost = 0, total = rows.length;
+
+  rows.forEach(r => {
+    const src = classifySource(r['Lead Source'], r['Source comments / Campaign code']);
+    sources[src] = (sources[src] || 0) + 1;
+
+    const stage = r['Stage'] || 'Unknown';
+    stages[stage] = (stages[stage] || 0) + 1;
+    if (stage === 'Closed Lost') closedLost++;
+
+    const intent = getIntent(r['Source comments / Campaign code']);
+    if (intent) intents[intent] = (intents[intent] || 0) + 1;
+
+    if (src === 'Google / Baidu Ads') googlePaid++;
+    else if (src === 'Google Ads (re-classified)') { googlePaid++; googleReclass++; }
+    else if (src === 'Organic search') organic++;
+    else if (src === 'Social') social++;
+    else if (src === 'Unknown') unknown++;
+    else if (src === 'Referral / Professional') referral++;
+    else if (src === 'Leadoo') leadoo++;
+    else if (src === 'YouTube') youtube++;
+  });
+
+  return { weekLabel, total, sources, stages, intents, googlePaid, organic, social, unknown, referral, leadoo, youtube, closedLost, googleReclass, filename };
+}
+
+// ─── Charts ───────────────────────────────────────────────────────────────────
+let charts = {};
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+const TICK = { color: '#666', font: { family: 'DM Mono', size: 11 } };
+const GRID = { color: 'rgba(255,255,255,0.05)' };
+const BASE_OPTS = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { display: false }, tooltip: { backgroundColor: '#202026', titleColor: '#ccc', bodyColor: '#999', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 } },
+  scales: {
+    x: { ticks: { ...TICK, autoSkip: false, maxRotation: weeks.length > 6 ? 45 : 0 }, grid: { display: false } },
+    y: { ticks: TICK, grid: GRID, beginAtZero: true }
+  }
+};
+
+const SOURCE_COLORS = {
+  'Google / Baidu Ads': '#4a9eff',
+  'Google Ads (re-classified)': '#85B7EB',
+  'Organic search': '#4ecb8b',
+  'Social': '#e06b8b',
+  'Referral / Professional': '#9b7fff',
+  'Leadoo': '#f5a623',
+  'YouTube': '#2dd4bf',
+  'Unknown': '#4a4a54',
+  'Other': '#666'
+};
+
+function renderCharts() {
+  const labels = weeks.map(w => w.weekLabel);
+  const n = weeks.length;
+
+  // Total
+  destroyChart('totalChart');
+  const totalColors = weeks.map((w,i) => i === n-1 ? '#4a9eff' : '#2a2a36');
+  charts['totalChart'] = new Chart(document.getElementById('totalChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data: weeks.map(w => w.total), backgroundColor: totalColors, borderRadius: 4 }] },
+    options: { ...BASE_OPTS, scales: { x: BASE_OPTS.scales.x, y: { ...BASE_OPTS.scales.y } } }
+  });
+
+  // Stacked source
+  const allSources = [...new Set(weeks.flatMap(w => Object.keys(w.sources)))];
+  const orderedSources = Object.keys(SOURCE_COLORS).filter(s => allSources.includes(s));
+  const stackedDatasets = orderedSources.map(src => ({
+    label: src,
+    data: weeks.map(w => w.sources[src] || 0),
+    backgroundColor: SOURCE_COLORS[src],
+    stack: 's'
+  }));
+
+  destroyChart('stackedChart');
+  charts['stackedChart'] = new Chart(document.getElementById('stackedChart'), {
+    type: 'bar',
+    data: { labels, datasets: stackedDatasets },
+    options: { ...BASE_OPTS, scales: {
+      x: { ...BASE_OPTS.scales.x, stacked: true },
+      y: { ...BASE_OPTS.scales.y, stacked: true }
+    }}
+  });
+
+  // Legend for stacked
+  const leg = document.getElementById('sourceLegend');
+  leg.innerHTML = orderedSources.map(s => `
+    <span class="legend-item"><span class="ldot" style="background:${SOURCE_COLORS[s]}"></span>${s}</span>
+  `).join('');
+
+  // Channel line
+  destroyChart('channelChart');
+  charts['channelChart'] = new Chart(document.getElementById('channelChart'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: 'Google paid', data: weeks.map(w => w.googlePaid), borderColor: '#4a9eff', backgroundColor: 'rgba(74,158,255,0.08)', tension: 0.35, pointRadius: 4, fill: true },
+      { label: 'Organic', data: weeks.map(w => w.organic), borderColor: '#4ecb8b', backgroundColor: 'transparent', tension: 0.35, pointRadius: 4, borderDash: [5,3] },
+      { label: 'Social', data: weeks.map(w => w.social), borderColor: '#e06b8b', backgroundColor: 'transparent', tension: 0.35, pointRadius: 4, borderDash: [2,2] }
+    ]},
+    options: BASE_OPTS
+  });
+
+  // Intent
+  destroyChart('intentChart');
+  charts['intentChart'] = new Chart(document.getElementById('intentChart'), {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Cracking', data: weeks.map(w => w.intents['Cracking'] || 0), backgroundColor: '#e06b8b' },
+      { label: 'Subsidence', data: weeks.map(w => w.intents['Subsidence'] || 0), backgroundColor: '#4a9eff' },
+      { label: 'Underpinning', data: weeks.map(w => w.intents['Underpinning'] || 0), backgroundColor: '#9b7fff' },
+      { label: 'Other', data: weeks.map(w => (w.intents['Heave']||0)+(w.intents['Resin']||0)+(w.intents['Landslip']||0)), backgroundColor: '#4ecb8b' }
+    ]},
+    options: BASE_OPTS
+  });
+
+  // Pipeline
+  const pipelineStages = ['Validate','Qualify','Evaluate','Negotiate','Delivery'];
+  const pipelineColors = ['#1a5fa5','#4a9eff','#85B7EB','#4ecb8b','#2dd4bf'];
+  destroyChart('pipelineChart');
+  charts['pipelineChart'] = new Chart(document.getElementById('pipelineChart'), {
+    type: 'bar',
+    data: { labels, datasets: pipelineStages.map((s,i) => ({
+      label: s,
+      data: weeks.map(w => w.stages[s] || 0),
+      backgroundColor: pipelineColors[i]
+    }))},
+    options: BASE_OPTS
+  });
+
+  // Closed lost
+  destroyChart('lostChart');
+  charts['lostChart'] = new Chart(document.getElementById('lostChart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Closed lost', data: weeks.map(w => w.closedLost), backgroundColor: '#ff5f5f', borderRadius: 4 }] },
+    options: BASE_OPTS
+  });
+
+  // Unknown rate
+  destroyChart('unknownChart');
+  charts['unknownChart'] = new Chart(document.getElementById('unknownChart'), {
+    type: 'line',
+    data: { labels, datasets: [{
+      label: '% unknown source',
+      data: weeks.map(w => Math.round(w.unknown / w.total * 100)),
+      borderColor: '#f5a623',
+      backgroundColor: 'rgba(245,166,35,0.08)',
+      tension: 0.35,
+      pointRadius: 4,
+      fill: true
+    }]},
+    options: { ...BASE_OPTS, scales: {
+      x: BASE_OPTS.scales.x,
+      y: { ...BASE_OPTS.scales.y, ticks: { ...TICK, callback: v => v + '%' } }
+    }}
+  });
+}
+
+// ─── KPIs ─────────────────────────────────────────────────────────────────────
+function renderKPIs() {
+  const grid = document.getElementById('kpiGrid');
+  if (!weeks.length) { grid.innerHTML = ''; return; }
+  const latest = weeks[weeks.length - 1];
+  const prev = weeks.length > 1 ? weeks[weeks.length - 2] : null;
+  const total4 = weeks.slice(-4).reduce((a,w) => a+w.total, 0);
+
+  function delta(a, b, key) {
+    if (!b) return '';
+    const diff = Math.round((a[key] - b[key]) / b[key] * 100);
+    if (diff === 0) return `<span class="kpi-sub">no change</span>`;
+    return `<span class="kpi-sub ${diff > 0 ? 'up' : 'down'}">${diff > 0 ? '↑' : '↓'} ${Math.abs(diff)}% vs prev week</span>`;
+  }
+
+  grid.innerHTML = `
+    <div class="kpi">
+      <div class="kpi-label">Latest week opps</div>
+      <div class="kpi-value">${latest.total}</div>
+      ${delta(latest, prev, 'total')}
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Google paid (latest)</div>
+      <div class="kpi-value">${latest.googlePaid}</div>
+      ${delta(latest, prev, 'googlePaid')}
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Unknown source %</div>
+      <div class="kpi-value">${Math.round(latest.unknown/latest.total*100)}%</div>
+      <span class="kpi-sub ${latest.unknown/latest.total > 0.35 ? 'down' : 'up'}">${latest.unknown} of ${latest.total} leads</span>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Referrals (latest)</div>
+      <div class="kpi-value">${latest.referral}</div>
+      ${delta(latest, prev, 'referral')}
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Social leads (latest)</div>
+      <div class="kpi-value">${latest.social}</div>
+      ${delta(latest, prev, 'social')}
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Closed lost (latest)</div>
+      <div class="kpi-value">${latest.closedLost}</div>
+      ${delta(latest, prev, 'closedLost')}
+    </div>
+  `;
+}
+
+// ─── Alerts ───────────────────────────────────────────────────────────────────
+function renderAlerts() {
+  const box = document.getElementById('alerts');
+  if (weeks.length < 2) { box.innerHTML = ''; return; }
+  const latest = weeks[weeks.length - 1];
+  const prev = weeks[weeks.length - 2];
+  const alerts = [];
+
+  const unknownPct = Math.round(latest.unknown / latest.total * 100);
+  if (unknownPct >= 40) alerts.push({ type: 'danger', text: `<strong>High unknown source rate:</strong> ${unknownPct}% of leads this week have no identified source (${latest.unknown} of ${latest.total}). Source field must be mandatory at point of capture.` });
+  else if (unknownPct >= 30) alerts.push({ type: 'warn', text: `<strong>Elevated unknown source rate:</strong> ${unknownPct}% of leads this week are unattributed — above the 30% warning threshold.` });
+
+  const googleDrop = prev.googlePaid > 0 ? Math.round((latest.googlePaid - prev.googlePaid) / prev.googlePaid * 100) : 0;
+  if (googleDrop <= -25) alerts.push({ type: 'danger', text: `<strong>Google paid drop:</strong> Confirmed Google leads fell from ${prev.googlePaid} to ${latest.googlePaid} (${googleDrop}%). Check ad spend, impression share, and campaign status.` });
+  else if (googleDrop <= -15) alerts.push({ type: 'warn', text: `<strong>Google paid dip:</strong> Google leads down ${Math.abs(googleDrop)}% week on week — worth monitoring.` });
+
+  if (latest.organic === 0 && prev.organic > 3) alerts.push({ type: 'warn', text: `<strong>Organic search fell to zero</strong> after reaching ${prev.organic} last week. Check Google Search Console for ranking changes.` });
+
+  if (latest.leadoo === 0 && weeks.some(w => w.leadoo > 0)) alerts.push({ type: 'warn', text: `<strong>Leadoo self-service form:</strong> No leads recorded this week. Check if the form is still live and being captured correctly.` });
+
+  if (latest.referral === 0 && prev.referral >= 3) alerts.push({ type: 'warn', text: `<strong>Referral channel quiet:</strong> No referrals from surveyors or structural engineers this week — consider whether the professional network needs nurturing.` });
+
+  const totalDelta = Math.round((latest.total - prev.total) / prev.total * 100);
+  if (totalDelta >= 20) alerts.push({ type: 'ok', text: `<strong>Volume up ${totalDelta}%:</strong> ${latest.total} opps this week vs ${prev.total} last week — strong growth.` });
+
+  if (latest.social >= 5) alerts.push({ type: 'ok', text: `<strong>Social generating ${latest.social} leads this week</strong> — highest recent rate. Ensure Facebook/Instagram campaigns are being tracked with UTM parameters.` });
+
+  box.innerHTML = alerts.map(a => `
+    <div class="alert alert-${a.type}">
+      <span>${a.text}</span>
+    </div>
+  `).join('');
+}
+
+// ─── Pills ────────────────────────────────────────────────────────────────────
+function renderPills() {
+  const container = document.getElementById('weeksPills');
+  if (!weeks.length) {
+    container.innerHTML = '<span>Weeks loaded:</span><em style="font-size:12px;color:var(--dim);font-style:normal">None — upload a CSV to begin</em>';
+    return;
+  }
+  container.innerHTML = '<span>Weeks loaded:</span>' + weeks.map((w,i) => `
+    <span class="pill">${w.weekLabel} (${w.total})
+      <button onclick="removeWeek(${i})" title="Remove this week">×</button>
+    </span>
+  `).join('');
+}
+
+// ─── Render all ───────────────────────────────────────────────────────────────
+function renderAll() {
+  const hasData = weeks.length > 0;
+  document.getElementById('emptyState').style.display = hasData ? 'none' : 'block';
+  document.getElementById('dashboard').style.display = hasData ? 'block' : 'none';
+  document.getElementById('clearBtn').style.display = hasData ? 'inline-flex' : 'none';
+  document.getElementById('lastUpdated').textContent = hasData ? `Last updated: ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})}` : '';
+  renderPills();
+  if (hasData) {
+    renderKPIs();
+    renderAlerts();
+    renderCharts();
+  }
+}
+
+// ─── File handling ────────────────────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', e => {
+  handleFiles([...e.target.files]);
+  e.target.value = '';
+});
+
+function handleFiles(files) {
+  let loaded = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const parsed = parseCSV(e.target.result, file.name);
+      if (parsed) {
+        const exists = weeks.findIndex(w => w.weekLabel === parsed.weekLabel);
+        if (exists >= 0) weeks[exists] = parsed;
+        else weeks.push(parsed);
+        weeks.sort((a,b) => {
+          const da = new Date(a.weekLabel.split(' – ')[0].split(' ').reverse().join(' '));
+          const db = new Date(b.weekLabel.split(' – ')[0].split(' ').reverse().join(' '));
+          return da - db;
+        });
+      }
+      loaded++;
+      if (loaded === files.length) { saveState(); renderAll(); }
+    };
+    reader.readAsText(file, 'latin1');
+  });
+}
+
+function removeWeek(i) {
+  weeks.splice(i, 1);
+  saveState();
+  renderAll();
+}
+
+function clearAllData() {
+  if (!confirm('Remove all weeks and start fresh?')) return;
+  weeks = [];
+  saveState();
+  renderAll();
+}
+
+// ─── Drag & drop ─────────────────────────────────────────────────────────────
+const overlay = document.getElementById('dropOverlay');
+let dragCount = 0;
+document.addEventListener('dragenter', e => { e.preventDefault(); dragCount++; overlay.classList.add('active'); });
+document.addEventListener('dragleave', () => { dragCount--; if (dragCount <= 0) { dragCount = 0; overlay.classList.remove('active'); } });
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault(); dragCount = 0; overlay.classList.remove('active');
+  const files = [...e.dataTransfer.files].filter(f => f.name.endsWith('.csv'));
+  if (files.length) handleFiles(files);
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+loadState();
+renderAll();
+</script>
+</body>
+</html>
