@@ -564,14 +564,14 @@ function openPanel(srcName){
   const trendLabels=campWeeks.map(w=>w.label.split(' ')[0]+' '+w.label.split(' ')[1]);
   html+=`<div class="panel-section">Week on week trend</div>`;
   html+=`<div class="panel-chart-wrap" style="height:150px"><canvas id="pSessChart"></canvas></div>`;
-  html+=`<div class="panel-chart-wrap" style="height:130px;margin-top:14px"><canvas id="pEngChart"></canvas></div>`;
+  html+=`<div class="panel-chart-wrap" style="height:130px;margin-top:14px"><canvas id="pKeyChart"></canvas></div>`;
   html+=`<div class="panel-section">vs other sources — latest week sessions</div>`;
   html+=`<div id="vsDiv"></div>`;
   document.getElementById('panelBody').innerHTML=html;
   const PT={color:'#555',font:{family:'DM Mono',size:10}},PG={color:'rgba(255,255,255,0.04)'};
   const bOpts={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#202026',titleColor:'#ccc',bodyColor:'#999'}},scales:{x:{ticks:PT,grid:{display:false}},y:{ticks:PT,grid:PG,beginAtZero:true}}};
   new Chart(document.getElementById('pSessChart'),{type:'bar',data:{labels:trendLabels,datasets:[{data:campWeeks.map(w=>w.data?.sessions||null),backgroundColor:'#4a9eff',borderRadius:3,spanGaps:true}]},options:bOpts});
-  new Chart(document.getElementById('pEngChart'),{type:'line',data:{labels:trendLabels,datasets:[{data:campWeeks.map(w=>w.data?+(w.data.engRate*100).toFixed(1):null),borderColor:'#4ecb8b',backgroundColor:'rgba(78,203,139,0.07)',tension:.35,pointRadius:4,fill:true,spanGaps:true}]},options:{...bOpts,scales:{...bOpts.scales,y:{...bOpts.scales.y,ticks:{...PT,callback:v=>v+'%'}}}}});
+  new Chart(document.getElementById('pKeyChart'),{type:'bar',data:{labels:trendLabels,datasets:[{data:campWeeks.map(w=>w.data?.keyEvents||null),backgroundColor:'#4ecb8b',borderRadius:3,spanGaps:true}]},options:{...bOpts,scales:{...bOpts.scales,y:{...bOpts.scales.y,ticks:{...PT,stepSize:1}}}}});
   // vs comparison
   const latest=weeks[weeks.length-1];
   const top=latest.sources.filter(r=>!r.junk).sort((a,b)=>b.sessions-a.sessions).slice(0,12);
