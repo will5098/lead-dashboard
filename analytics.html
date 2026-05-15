@@ -456,10 +456,7 @@ function renderCharts(){
       plugins:{...BASE.plugins,
         tooltip:{...BASE.plugins.tooltip,
           callbacks:{
-            afterBody: items => {
-              const w = weeks[items[0].dataIndex];
-              const rate = w.totalSessions > 0 ? (w.totalKeyEvents/w.totalSessions*100).toFixed(2) : 0;
-              return [\`Total: \${w.totalKeyEvents} events\`, \`Conv. rate: \${rate}%\`];
+            afterBody: items => { const w = weeks[items[0].dataIndex]; const rate = w.totalSessions > 0 ? (w.totalKeyEvents/w.totalSessions*100).toFixed(2) : 0; return ['Total: '+w.totalKeyEvents+' events', 'Conv. rate: '+rate+'%']; } events\`, \`Conv. rate: \${rate}%\`];
             }
           }
         }
