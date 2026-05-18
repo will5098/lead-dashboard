@@ -322,7 +322,7 @@ function renderStageValue(){
 
 // ── Charts ────────────────────────────────────────────────────────────────────
 function renderCharts(){
-  const labels = FUNNEL_DATA.map(w=>w.weekLabel);
+  const labels = FUNNEL_DATA.map(w=>w.weekLabel.split(' – ')[0].replace(' ', '.'));
 
   // CPO trend
   dc('cpoChart');
