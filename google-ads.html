@@ -709,9 +709,10 @@ function openPanel(campName) {
 
   // Week on week trend charts
   if (campWeeks.filter(w=>w.data).length >= 1) {
-    html += `<div class="panel-section">Week on week trend</div>`;
+    html += `<div class="panel-section">Week on week — clicks, conv. rate &amp; conversions</div>`;
     html += `<div class="panel-chart-wrap" style="height:160px"><canvas id="panelClicksChart"></canvas></div>`;
     html += `<div class="panel-chart-wrap" style="height:140px;margin-top:14px"><canvas id="panelConvChart"></canvas></div>`;
+    html += `<div class="panel-chart-wrap" style="height:140px;margin-top:14px"><canvas id="panelConvVolChart"></canvas></div>`;
     html += `<div class="panel-chart-wrap" style="height:140px;margin-top:14px"><canvas id="panelSpendChart"></canvas></div>`;
   }
 
@@ -739,6 +740,10 @@ function openPanel(campName) {
   }
   if (document.getElementById('panelConvChart')) {
     new Chart(document.getElementById('panelConvChart'), { type:'line', data:{ labels:trendLabels, datasets:[{data:convData,borderColor:'#4ecb8b',backgroundColor:'rgba(78,203,139,0.07)',tension:0.35,pointRadius:4,fill:true,spanGaps:true}] }, options:{...baseOpts,scales:{...baseOpts.scales,y:{...baseOpts.scales.y,ticks:{...PT,callback:v=>v+'%'}}},plugins:{...baseOpts.plugins,tooltip:{...baseOpts.plugins.tooltip,callbacks:{label:i=>i.raw+'% conv rate'}}}} });
+  }
+  const convVolData = campWeeks.map(w => w.data ? +w.data.conversions.toFixed(1) : null);
+  if (document.getElementById('panelConvVolChart')) {
+    new Chart(document.getElementById('panelConvVolChart'), { type:'bar', data:{ labels:trendLabels, datasets:[{data:convVolData, backgroundColor:'#4ecb8b', borderRadius:3, spanGaps:true}] }, options:{...baseOpts} });
   }
   if (document.getElementById('panelSpendChart')) {
     new Chart(document.getElementById('panelSpendChart'), { type:'bar', data:{ labels:trendLabels, datasets:[{data:spendData,backgroundColor:'#f5a623',borderRadius:3,spanGaps:true}] }, options:{...baseOpts,scales:{...baseOpts.scales,y:{...baseOpts.scales.y,ticks:{...PT,callback:v=>'£'+v}}}} });
