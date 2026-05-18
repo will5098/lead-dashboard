@@ -119,7 +119,8 @@
       <div class="legend">
         <span class="legend-item"><span class="ldot" style="background:#4ecb8b"></span>Total pipeline value (£)</span>
         <span class="legend-item"><span class="ldot" style="background:#f5a623"></span>Google Ads spend (£)</span>
-        <span class="legend-item"><span class="ldot" style="background:#2dd4bf"></span>Confirmed order value (£)</span>
+        <span class="legend-item"><span class="ldot" style="background:#2dd4ff"></span>Confirmed revenue (£17k avg)</span>
+        <span class="legend-item"><span class="ldot" style="background:#9b7fff"></span>Projected revenue (10% conv.)</span>
       </div>
       <div class="chart-wrap" style="height:210px"><canvas id="roiChart"></canvas></div>
     </div>
@@ -136,14 +137,16 @@
             <th class="num">CPO (Google)</th>
             <th class="num">Delivery</th>
             <th class="num">Cost / order</th>
-            <th class="num">Order value</th>
+            <th class="num">Confirmed rev.</th>
+            <th class="num">Proj. orders</th>
+            <th class="num">Proj. revenue</th>
+            <th class="num">Proj. ROI</th>
             <th class="num">Pipeline value</th>
-            <th class="num">ROI</th>
           </tr>
         </thead>
         <tbody id="cpoTableBody"></tbody>
       </table>
-      <p class="card-note">CPO = Google Ads spend ÷ Google-attributed leads. Cost/order = spend ÷ Delivery (Won) count. ROI = pipeline value ÷ spend.</p>
+      <p class="card-note">CPO = Google Ads spend ÷ Google-attributed leads. Projections based on 10% conversion of active leads × £17k avg order value. ~60 day lag to Delivery. Confirmed = Delivery stage only.</p>
     </div>
   </div>
 </main>
@@ -159,6 +162,8 @@ const FUNNEL_DATA = [{"weekLabel":"13 Apr \u2013 19 Apr","total":89,"stages":{"Q
 
 const ADS_SPEND  = [5404, 5145, 5685, 5838, 5759];
 const GOOGLE_LEADS = [56, 50, 62, 39, 45];
+const AVG_ORDER_VALUE = 17000; // assumed average order value
+const CONV_RATE = 0.10; // assumed 10% conversion rate, ~60 day lag
 const STAGE_ORDER = ['Qualify','Validate','Evaluate','Negotiate','Delivery','Closed Lost'];
 const STAGE_DISPLAY = {'Qualify':'Qualify','Validate':'Validate','Evaluate':'Evaluate','Negotiate':'Negotiate','Delivery':'Delivery (Won)','Closed Lost':'Closed Lost'};
 const STAGE_COLORS = {
@@ -208,8 +213,14 @@ function renderKPIs(){
   const cpo = gLeads > 0 ? Math.round(spend/gLeads) : 0;
   const prevCpo = prev && prevGLeads > 0 ? Math.round(prevSpend/prevGLeads) : null;
   const costPerOrder = w.deliveryCount > 0 ? Math.round(spend/w.deliveryCount) : 0;
-  const roi = spend > 0 ? (w.pipelineValue/spend).toFixed(1) : 0;
+  const wonRevenue = w.deliveryCount * AVG_ORDER_VALUE;
+  const revenueRoi = spend > 0 && wonRevenue > 0 ? (wonRevenue/spend).toFixed(1) : null;
+  const pipelineRoi = spend > 0 ? (w.pipelineValue/spend).toFixed(1) : 0;
+  const roi = pipelineRoi;
   const activeLeads = w.total - (w.stages['Closed Lost']||0);
+  const projOrders = +(activeLeads * CONV_RATE).toFixed(1);
+  const projRevenue = Math.round(projOrders * AVG_ORDER_VALUE);
+  const projRoi = spend > 0 ? (projRevenue/spend).toFixed(1) : 0;
 
   function delta(cur, prv, invert=false){
     if(!prv || prv===0) return '';
@@ -225,8 +236,10 @@ function renderKPIs(){
     <div class="kpi"><div class="kpi-label">Google CPO</div><div class="kpi-value">£${cpo.toLocaleString()}</div>${delta(cpo,prevCpo,true)}</div>
     <div class="kpi"><div class="kpi-label">Cost / order</div><div class="kpi-value">${costPerOrder>0?'£'+costPerOrder.toLocaleString():'—'}</div><div class="kpi-sub">${w.deliveryCount} order${w.deliveryCount!==1?'s':''} in Delivery</div></div>
     <div class="kpi"><div class="kpi-label">Pipeline value</div><div class="kpi-value">£${(w.pipelineValue/1000).toFixed(0)}k</div>${delta(w.pipelineValue,prev?.pipelineValue)}</div>
-    <div class="kpi"><div class="kpi-label">Pipeline ROI</div><div class="kpi-value">${roi}×</div><div class="kpi-sub">pipeline vs spend</div></div>
-    <div class="kpi"><div class="kpi-label">Avg order value</div><div class="kpi-value">${w.avgOrderValue>0?'£'+w.avgOrderValue.toLocaleString():'—'}</div><div class="kpi-sub">${w.deliveryCount} confirmed</div></div>
+    <div class="kpi"><div class="kpi-label">Confirmed orders</div><div class="kpi-value">${w.deliveryCount>0?w.deliveryCount:'—'}</div><div class="kpi-sub">${wonRevenue>0?'£'+(wonRevenue/1000).toFixed(0)+'k est. revenue':''}</div></div>
+    <div class="kpi"><div class="kpi-label">Projected orders</div><div class="kpi-value">${projOrders}</div><div class="kpi-sub">10% of ${activeLeads} active leads</div></div>
+    <div class="kpi"><div class="kpi-label">Projected revenue</div><div class="kpi-value">£${(projRevenue/1000).toFixed(0)}k</div><div class="kpi-sub">${projRoi}× projected ROI</div></div>
+    <div class="kpi"><div class="kpi-label">Pipeline ROI</div><div class="kpi-value">${pipelineRoi}×</div><div class="kpi-sub">pipeline value vs spend</div></div>
     <div class="kpi"><div class="kpi-label">Ads spend</div><div class="kpi-value">£${spend.toLocaleString()}</div>${delta(spend,prevSpend,true)}</div>
   `;
 }
@@ -332,9 +345,10 @@ function renderCharts(){
   charts['roiChart'] = new Chart(document.getElementById('roiChart'),{
     type:'bar',
     data:{labels,datasets:[
-      {label:'Pipeline value',data:FUNNEL_DATA.map(w=>w.pipelineValue),backgroundColor:'rgba(78,203,139,0.5)',borderRadius:3,stack:'s'},
+      {label:'Pipeline value',data:FUNNEL_DATA.map(w=>w.pipelineValue),backgroundColor:'rgba(78,203,139,0.15)',borderRadius:3,stack:'s'},
       {label:'Ads spend',type:'line',data:ADS_SPEND,borderColor:'#f5a623',backgroundColor:'transparent',tension:.35,pointRadius:4},
-      {label:'Order value',type:'line',data:FUNNEL_DATA.map(w=>w.deliveryValue),borderColor:'#2dd4bf',backgroundColor:'transparent',tension:.35,pointRadius:4,borderDash:[5,3]}
+      {label:'Confirmed revenue (£17k avg)',type:'line',data:FUNNEL_DATA.map(w=>w.deliveryCount*AVG_ORDER_VALUE),borderColor:'#2dd4bf',backgroundColor:'transparent',tension:.35,pointRadius:5,borderDash:[5,3]},
+      {label:'Projected revenue (10% conv.)',type:'line',data:FUNNEL_DATA.map(w=>Math.round((w.total-(w.stages['Closed Lost']||0))*CONV_RATE*AVG_ORDER_VALUE)),borderColor:'#9b7fff',backgroundColor:'transparent',tension:.35,pointRadius:4,borderDash:[2,3]}
     ]},
     options:{...BASE,scales:{
       x:BASE.scales.x,
@@ -362,9 +376,11 @@ function renderTable(){
       <td class="num"><span class="badge ${cpoClass}">£${cpo}</span></td>
       <td class="num">${w.deliveryCount > 0 ? w.deliveryCount : '—'}</td>
       <td class="num">${costPerOrder > 0 ? '£'+costPerOrder.toLocaleString() : '—'}</td>
-      <td class="num">${w.avgOrderValue > 0 ? '£'+w.avgOrderValue.toLocaleString() : '—'}</td>
+      <td class="num">${w.deliveryCount > 0 ? '£'+(w.deliveryCount*17000).toLocaleString() : '—'}</td>
+      <td class="num">${((w.total-(w.stages['Closed Lost']||0))*0.1).toFixed(1)}</td>
+      <td class="num">£${(Math.round((w.total-(w.stages['Closed Lost']||0))*0.1)*17000/1000).toFixed(0)}k</td>
+      <td class="num">${(Math.round((w.total-(w.stages['Closed Lost']||0))*0.1)*17000/ADS_SPEND[i]).toFixed(1)}×</td>
       <td class="num">£${(w.pipelineValue/1000).toFixed(0)}k</td>
-      <td class="num">${roi}×</td>
     </tr>`;
   }).join('');
 }
