@@ -369,7 +369,7 @@ const BASE={responsive:true,maintainAspectRatio:false,
 
 function renderCharts(){
   const activeIdx=selectedWeekIdx===-1?weeks.length-1:selectedWeekIdx;
-  const labels = weeks.map(w=>w.dateLabel);
+  const labels = weeks.map(w=>w.dateLabel.split(' – ')[0].replace(' ', '.'));
   const n = weeks.length;
   const allChannels = [...new Set(weeks.flatMap(w=>Object.keys(w.channelMap)))];
   const mainChannels = ['Google Paid','Google Organic','Bing / Microsoft','Social Paid','Social Organic','AI Referral','Direct','Email','Referral'].filter(c=>allChannels.includes(c));
