@@ -466,7 +466,7 @@ const SOURCE_COLORS = {
 };
 
 function renderCharts() {
-  const labels = weeks.map(w => w.weekLabel);
+  const labels = weeks.map(w => w.weekLabel.split(' – ')[0].replace(' ', '.'));
   const n = weeks.length;
 
   // Total
