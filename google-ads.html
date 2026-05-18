@@ -443,7 +443,7 @@ const BASE = {
 };
 
 function renderCharts() {
-  const labels = weeks.map(w => w.dateLabel);
+  const labels = weeks.map(w => w.dateLabel.split(' - ')[0].replace(' ', '.'));
   const n = weeks.length;
   const hi = (i) => i === n-1 ? '#4a9eff' : '#2a3a4a';
   const hiAmber = (i) => i === n-1 ? '#f5a623' : '#3a2a10';
