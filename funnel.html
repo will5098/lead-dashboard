@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Funnel & Cost Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  :root {
+    --bg:#0f0f11;--surface:#18181c;--surface2:#202026;
+    --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
+    --text:#f0f0f0;--muted:#888;--dim:#555;
+    --blue:#4a9eff;--green:#4ecb8b;--green-dim:#1a3d2b;
+    --red:#ff5f5f;--red-dim:#3d1a1a;--amber:#f5a623;--amber-dim:#3d2a0a;
+    --purple:#9b7fff;--teal:#2dd4bf;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+  nav{padding:0 32px;border-bottom:1px solid var(--border);display:flex;align-items:stretch;height:44px}
+  .nav-link{display:flex;align-items:center;padding:0 16px;font-size:13px;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;transition:color .15s}
+  .nav-link:hover{color:var(--text)}
+  .nav-link.active{color:var(--blue);border-bottom-color:var(--blue)}
+  header{padding:24px 32px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .header-left h1{font-size:18px;font-weight:600;letter-spacing:-.02em}
+  .header-left p{font-size:12px;color:var(--muted);margin-top:3px}
+  .weeks-pills{display:flex;gap:6px;flex-wrap:wrap;padding:10px 32px;border-bottom:1px solid var(--border);align-items:center;min-height:44px}
+  .weeks-pills span{font-size:11px;color:var(--muted);margin-right:4px}
+  .pill{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);cursor:pointer;transition:background .15s,border-color .15s}
+  .pill.selected{background:#1a3a5c;border-color:var(--blue);color:var(--blue)}
+  main{padding:24px 32px;max-width:1100px}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:24px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .kpi-label{font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500;letter-spacing:.04em;text-transform:uppercase}
+  .kpi-value{font-size:24px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:-.03em}
+  .kpi-sub{font-size:11px;margin-top:4px;color:var(--muted)}
+  .kpi-sub.up{color:var(--green)}.kpi-sub.down{color:var(--red)}
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  .chart-full{grid-column:1/-1}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px}
+  .card-title{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+  .card-note{font-size:11px;color:var(--dim);margin-top:10px}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+  .legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+  .ldot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+  .chart-wrap{position:relative;width:100%}
+  /* Funnel */
+  .funnel-wrap{display:flex;flex-direction:column;gap:6px;padding:4px 0}
+  .funnel-row{display:flex;align-items:center;gap:12px}
+  .funnel-label{font-size:12px;color:var(--muted);min-width:90px;text-align:right}
+  .funnel-bar-track{flex:1;height:32px;background:var(--surface2);border-radius:4px;overflow:hidden;position:relative}
+  .funnel-bar-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:10px;font-size:11px;font-family:'DM Mono',monospace;font-weight:500;transition:width .4s ease}
+  .funnel-meta{font-size:11px;font-family:'DM Mono',monospace;color:var(--muted);min-width:80px}
+  .funnel-pct{font-size:10px;color:var(--dim);min-width:40px;text-align:right}
+  /* CPO table */
+  .cpo-table{width:100%;border-collapse:collapse;font-size:12px}
+  .cpo-table th{text-align:left;padding:6px 10px;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border)}
+  .cpo-table td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:middle}
+  .cpo-table tr:last-child td{border-bottom:none}
+  .cpo-table .num{font-family:'DM Mono',monospace;text-align:right}
+  .cpo-table .highlight{color:var(--text);font-weight:500}
+  .badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500}
+  .badge-green{background:var(--green-dim);color:var(--green)}
+  .badge-red{background:var(--red-dim);color:var(--red)}
+  .badge-amber{background:var(--amber-dim);color:var(--amber)}
+  .alert{padding:10px 14px;border-radius:8px;font-size:12px;line-height:1.6;border-left:3px solid;margin-bottom:8px}
+  .alert-warn{background:var(--amber-dim);border-color:var(--amber);color:#d4a04a}
+  .alert-ok{background:var(--green-dim);border-color:var(--green);color:#50b87a}
+  .alert strong{font-weight:600}
+  footer{padding:20px 32px;border-top:1px solid var(--border);font-size:11px;color:var(--dim);display:flex;justify-content:space-between;margin-top:32px}
+  @media(max-width:700px){header,main,.weeks-pills,nav,footer{padding-left:16px;padding-right:16px}.charts-grid{grid-template-columns:1fr}.chart-full{grid-column:1}}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-link" href="index.html">Lead sources</a>
+  <a class="nav-link" href="google-ads.html">Google Ads</a>
+  <a class="nav-link" href="analytics.html">Analytics</a>
+  <a class="nav-link active" href="funnel.html">Funnel & Cost</a>
+</nav>
+
+<header>
+  <div class="header-left">
+    <h1>Funnel &amp; cost per opportunity</h1>
+    <p>Pipeline conversion, cost per lead, cost per order and ROI — all weeks combined</p>
+  </div>
+</header>
+
+<div class="weeks-pills" id="weeksPills"></div>
+
+<main>
+  <div class="kpi-grid" id="kpiGrid"></div>
+  <div id="alerts"></div>
+
+  <div class="charts-grid" style="margin-top:20px">
+    <div class="card chart-full">
+      <div class="card-title">Cost per Google opportunity — week on week</div>
+      <div class="legend">
+        <span class="legend-item"><span class="ldot" style="background:#4a9eff"></span>CPO (£ per lead)</span>
+        <span class="legend-item"><span class="ldot" style="background:#f5a623"></span>Google Ads spend (£)</span>
+      </div>
+      <div class="chart-wrap" style="height:210px"><canvas id="cpoChart"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Pipeline funnel — selected week</div>
+      <div class="funnel-wrap" id="funnelViz"></div>
+      <p class="card-note">Based on stage at time of export. Delivery (Won) = contract signed, work scheduled.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Pipeline value by stage — selected week</div>
+      <div class="chart-wrap" style="height:240px"><canvas id="stageValueChart"></canvas></div>
+    </div>
+
+    <div class="card chart-full">
+      <div class="card-title">Pipeline value generated — week on week</div>
+      <div class="legend">
+        <span class="legend-item"><span class="ldot" style="background:#4ecb8b"></span>Total pipeline value (£)</span>
+        <span class="legend-item"><span class="ldot" style="background:#f5a623"></span>Google Ads spend (£)</span>
+        <span class="legend-item"><span class="ldot" style="background:#2dd4bf"></span>Confirmed order value (£)</span>
+      </div>
+      <div class="chart-wrap" style="height:210px"><canvas id="roiChart"></canvas></div>
+    </div>
+
+    <div class="card chart-full">
+      <div class="card-title">Full cost breakdown — all weeks</div>
+      <table class="cpo-table" id="cpoTable">
+        <thead>
+          <tr>
+            <th>Week</th>
+            <th class="num">Total leads</th>
+            <th class="num">Google leads</th>
+            <th class="num">Ads spend</th>
+            <th class="num">CPO (Google)</th>
+            <th class="num">Delivery</th>
+            <th class="num">Cost / order</th>
+            <th class="num">Order value</th>
+            <th class="num">Pipeline value</th>
+            <th class="num">ROI</th>
+          </tr>
+        </thead>
+        <tbody id="cpoTableBody"></tbody>
+      </table>
+      <p class="card-note">CPO = Google Ads spend ÷ Google-attributed leads. Cost/order = spend ÷ Delivery (Won) count. ROI = pipeline value ÷ spend.</p>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>Funnel &amp; cost dashboard — internal use only</span>
+  <span id="lastUpdated"></span>
+</footer>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────────
+const FUNNEL_DATA = [{"weekLabel":"13 Apr \u2013 19 Apr","total":89,"stages":{"Qualify":3,"Validate":12,"Evaluate":7,"Negotiate":11,"Delivery":3,"Closed Lost":53},"pipelineValue":230372,"deliveryValue":36966,"deliveryCount":3,"avgOrderValue":12322,"sourcePipeline":{"Social":{"count":1,"value":11170},"Google Ads":{"count":17,"value":132831},"Unknown":{"count":6,"value":18031},"Referral":{"count":5,"value":39505},"Organic":{"count":1,"value":3893},"Leadoo":{"count":2,"value":24942}}},{"weekLabel":"20 Apr \u2013 26 Apr","total":79,"stages":{"Qualify":0,"Validate":9,"Evaluate":4,"Negotiate":5,"Delivery":1,"Closed Lost":60},"pipelineValue":53787,"deliveryValue":7092,"deliveryCount":1,"avgOrderValue":7092,"sourcePipeline":{"Google Ads":{"count":11,"value":33289},"Unknown":{"count":3,"value":11265},"Social":{"count":2,"value":2026},"Referral":{"count":1,"value":4326},"Organic":{"count":1,"value":2881}}},{"weekLabel":"27 Apr \u2013 3 May","total":108,"stages":{"Qualify":18,"Validate":13,"Evaluate":7,"Negotiate":13,"Delivery":1,"Closed Lost":56},"pipelineValue":146389,"deliveryValue":5855,"deliveryCount":1,"avgOrderValue":5855,"sourcePipeline":{"Unknown":{"count":11,"value":83519},"Google Ads":{"count":26,"value":130327},"Referral":{"count":4,"value":42540},"YouTube":{"count":2,"value":14616},"Social":{"count":1,"value":8000},"Organic":{"count":8,"value":72010}}},{"weekLabel":"4 May \u2013 9 May","total":85,"stages":{"Qualify":23,"Validate":7,"Evaluate":10,"Negotiate":6,"Delivery":0,"Closed Lost":39},"pipelineValue":72568,"deliveryValue":0,"deliveryCount":0,"avgOrderValue":0,"sourcePipeline":{"Unknown":{"count":17,"value":135706},"Google Ads":{"count":15,"value":116474},"Social":{"count":8,"value":59840},"Referral":{"count":1,"value":11424}}},{"weekLabel":"11 May \u2013 17 May","total":96,"stages":{"Qualify":55,"Validate":10,"Evaluate":10,"Negotiate":3,"Delivery":0,"Closed Lost":18},"pipelineValue":16762,"deliveryValue":0,"deliveryCount":0,"avgOrderValue":0,"sourcePipeline":{"Organic":{"count":18,"value":95346},"YouTube":{"count":1,"value":7425},"Social":{"count":4,"value":16476},"Google Ads":{"count":20,"value":101574},"Referral":{"count":3,"value":19132},"Unknown":{"count":5,"value":26282},"Other":{"count":1,"value":0}}}];
+
+const ADS_SPEND  = [5404, 5145, 5685, 5838, 5759];
+const GOOGLE_LEADS = [56, 50, 62, 39, 45];
+const STAGE_ORDER = ['Qualify','Validate','Evaluate','Negotiate','Delivery','Closed Lost'];
+const STAGE_DISPLAY = {'Qualify':'Qualify','Validate':'Validate','Evaluate':'Evaluate','Negotiate':'Negotiate','Delivery':'Delivery (Won)','Closed Lost':'Closed Lost'};
+const STAGE_COLORS = {
+  'Qualify':'#4a9eff','Validate':'#378ADD','Evaluate':'#85B7EB',
+  'Negotiate':'#4ecb8b','Delivery (Won)':'#2dd4bf','Closed Lost':'#3a3a42'
+};
+
+let selectedIdx = FUNNEL_DATA.length - 1;
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+const fmt = (n, prefix='£') => n > 0 ? prefix + Math.round(n).toLocaleString() : '—';
+const TICK = {color:'#666',font:{family:'DM Mono',size:11}};
+const GRID = {color:'rgba(255,255,255,0.05)'};
+const BASE = {responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{display:false},tooltip:{backgroundColor:'#202026',titleColor:'#ccc',bodyColor:'#999',borderColor:'rgba(255,255,255,0.1)',borderWidth:1}},
+  scales:{x:{ticks:{...TICK,autoSkip:false,maxRotation:0},grid:{display:false}},y:{ticks:TICK,grid:GRID,beginAtZero:true}}};
+
+let charts = {};
+function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+// ── Pills ─────────────────────────────────────────────────────────────────────
+function renderPills(){
+  const container = document.getElementById('weeksPills');
+  container.innerHTML = '<span>Select week:</span>' + FUNNEL_DATA.map((w,i) =>
+    `<span class="pill ${i===selectedIdx?'selected':''}" onclick="selectWeek(${i})">${w.weekLabel}</span>`
+  ).join('');
+}
+
+function selectWeek(idx){
+  selectedIdx = idx;
+  renderPills();
+  renderKPIs();
+  renderAlerts();
+  renderFunnel();
+  renderStageValue();
+}
+
+// ── KPIs ──────────────────────────────────────────────────────────────────────
+function renderKPIs(){
+  const w = FUNNEL_DATA[selectedIdx];
+  const spend = ADS_SPEND[selectedIdx];
+  const gLeads = GOOGLE_LEADS[selectedIdx];
+  const prev = selectedIdx > 0 ? FUNNEL_DATA[selectedIdx-1] : null;
+  const prevSpend = selectedIdx > 0 ? ADS_SPEND[selectedIdx-1] : null;
+  const prevGLeads = selectedIdx > 0 ? GOOGLE_LEADS[selectedIdx-1] : null;
+
+  const cpo = gLeads > 0 ? Math.round(spend/gLeads) : 0;
+  const prevCpo = prev && prevGLeads > 0 ? Math.round(prevSpend/prevGLeads) : null;
+  const costPerOrder = w.deliveryCount > 0 ? Math.round(spend/w.deliveryCount) : 0;
+  const roi = spend > 0 ? (w.pipelineValue/spend).toFixed(1) : 0;
+  const activeLeads = w.total - (w.stages['Closed Lost']||0);
+
+  function delta(cur, prv, invert=false){
+    if(!prv || prv===0) return '';
+    const pct = Math.round((cur-prv)/prv*100);
+    if(pct===0) return '<span class="kpi-sub">no change</span>';
+    const good = invert ? pct < 0 : pct > 0;
+    return `<span class="kpi-sub ${good?'up':'down'}">${pct>0?'↑':'↓'}${Math.abs(pct)}% vs prev</span>`;
+  }
+
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi"><div class="kpi-label">Total leads</div><div class="kpi-value">${w.total}</div>${delta(w.total,prev?.total)}</div>
+    <div class="kpi"><div class="kpi-label">Active pipeline</div><div class="kpi-value">${activeLeads}</div><div class="kpi-sub">${w.stages['Closed Lost']||0} closed lost</div></div>
+    <div class="kpi"><div class="kpi-label">Google CPO</div><div class="kpi-value">£${cpo.toLocaleString()}</div>${delta(cpo,prevCpo,true)}</div>
+    <div class="kpi"><div class="kpi-label">Cost / order</div><div class="kpi-value">${costPerOrder>0?'£'+costPerOrder.toLocaleString():'—'}</div><div class="kpi-sub">${w.deliveryCount} order${w.deliveryCount!==1?'s':''} in Delivery</div></div>
+    <div class="kpi"><div class="kpi-label">Pipeline value</div><div class="kpi-value">£${(w.pipelineValue/1000).toFixed(0)}k</div>${delta(w.pipelineValue,prev?.pipelineValue)}</div>
+    <div class="kpi"><div class="kpi-label">Pipeline ROI</div><div class="kpi-value">${roi}×</div><div class="kpi-sub">pipeline vs spend</div></div>
+    <div class="kpi"><div class="kpi-label">Avg order value</div><div class="kpi-value">${w.avgOrderValue>0?'£'+w.avgOrderValue.toLocaleString():'—'}</div><div class="kpi-sub">${w.deliveryCount} confirmed</div></div>
+    <div class="kpi"><div class="kpi-label">Ads spend</div><div class="kpi-value">£${spend.toLocaleString()}</div>${delta(spend,prevSpend,true)}</div>
+  `;
+}
+
+// ── Alerts ────────────────────────────────────────────────────────────────────
+function renderAlerts(){
+  const w = FUNNEL_DATA[selectedIdx];
+  const spend = ADS_SPEND[selectedIdx];
+  const gLeads = GOOGLE_LEADS[selectedIdx];
+  const prev = selectedIdx > 0 ? FUNNEL_DATA[selectedIdx-1] : null;
+  const alerts = [];
+  const cpo = gLeads > 0 ? Math.round(spend/gLeads) : 0;
+  const prevCpo = prev ? Math.round(ADS_SPEND[selectedIdx-1]/(GOOGLE_LEADS[selectedIdx-1]||1)) : null;
+  if(prevCpo && cpo > prevCpo * 1.2) alerts.push({t:'warn', m:`<strong>CPO up ${Math.round((cpo-prevCpo)/prevCpo*100)}%:</strong> Cost per Google opportunity rose from £${prevCpo} to £${cpo}. Check for drop in lead volume or increase in spend.`});
+  if(w.stages['Qualify'] > 20) alerts.push({t:'warn', m:`<strong>${w.stages['Qualify']} leads in Qualify:</strong> Large top-of-funnel cohort — watch for conversion into Validate next week.`});
+  if(w.pipelineValue > spend * 10) alerts.push({t:'ok', m:`<strong>Strong pipeline ROI:</strong> £${(w.pipelineValue/1000).toFixed(0)}k pipeline generated against £${(spend/1000).toFixed(1)}k spend — ${(w.pipelineValue/spend).toFixed(1)}× return on active pipeline.`});
+  document.getElementById('alerts').innerHTML = alerts.map(a=>`<div class="alert alert-${a.t}">${a.m}</div>`).join('');
+}
+
+// ── Funnel viz ────────────────────────────────────────────────────────────────
+function renderFunnel(){
+  const w = FUNNEL_DATA[selectedIdx];
+  const total = w.total;
+  const container = document.getElementById('funnelViz');
+  const stages = STAGE_ORDER.filter(s => s !== 'Closed Lost');
+  container.innerHTML = stages.map(s => {
+    const count = w.stages[s] || 0;
+    const pct = Math.round(count/total*100);
+    const barW = Math.max(count/total*100, count>0?3:0);
+    return `<div class="funnel-row">
+      <div class="funnel-label">${STAGE_DISPLAY[s]||s}</div>
+      <div class="funnel-bar-track">
+        <div class="funnel-bar-fill" style="width:${barW}%;background:${STAGE_COLORS[s]};color:${count>4?'rgba(0,0,0,0.7)':'transparent'}">
+          ${count>4?count:''}
+        </div>
+      </div>
+      <div class="funnel-meta" style="color:${count>0?'var(--text)':'var(--dim)'}">${count > 0 ? count+' leads' : '—'}</div>
+      <div class="funnel-pct">${count>0?pct+'%':''}</div>
+    </div>`;
+  }).join('') + `<div class="funnel-row" style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
+    <div class="funnel-label" style="color:var(--dim)">Closed Lost</div>
+    <div class="funnel-bar-track">
+      <div class="funnel-bar-fill" style="width:${Math.round((w.stages['Closed Lost']||0)/total*100)}%;background:#3a3a42;color:var(--dim)">
+      </div>
+    </div>
+    <div class="funnel-meta" style="color:var(--dim)">${w.stages['Closed Lost']||0} leads</div>
+    <div class="funnel-pct" style="color:var(--dim)">${Math.round((w.stages['Closed Lost']||0)/total*100)}%</div>
+  </div>`;
+}
+
+// ── Stage value chart ─────────────────────────────────────────────────────────
+function renderStageValue(){
+  const w = FUNNEL_DATA[selectedIdx];
+  const sp = w.sourcePipeline;
+  const sources = Object.keys(sp).sort((a,b)=>sp[b].value-sp[a].value);
+  const SOURCE_COLORS_MAP = {
+    'Google Ads':'#4a9eff','Organic':'#4ecb8b','Social':'#e06b8b',
+    'Referral':'#9b7fff','Unknown':'#4a4a54','Leadoo':'#f5a623','YouTube':'#2dd4bf','Other':'#555'
+  };
+  dc('stageValueChart');
+  charts['stageValueChart'] = new Chart(document.getElementById('stageValueChart'),{
+    type:'bar',
+    data:{
+      labels: sources,
+      datasets:[
+        {label:'Pipeline value',data:sources.map(s=>sp[s].value),backgroundColor:sources.map(s=>SOURCE_COLORS_MAP[s]||'#555'),borderRadius:4},
+      ]
+    },
+    options:{...BASE,indexAxis:'y',
+      scales:{
+        x:{ticks:{...TICK,callback:v=>'£'+Math.round(v/1000)+'k'},grid:GRID},
+        y:{ticks:{...TICK,font:{family:'DM Sans',size:11}},grid:{display:false}}
+      },
+      plugins:{...BASE.plugins,tooltip:{...BASE.plugins.tooltip,callbacks:{
+        label:i=>`£${i.raw.toLocaleString()} pipeline (${FUNNEL_DATA[selectedIdx].sourcePipeline[i.label]?.count||0} leads)`
+      }}}
+    }
+  });
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+function renderCharts(){
+  const labels = FUNNEL_DATA.map(w=>w.weekLabel);
+
+  // CPO trend
+  dc('cpoChart');
+  const cpoData = FUNNEL_DATA.map((w,i) => GOOGLE_LEADS[i]>0 ? Math.round(ADS_SPEND[i]/GOOGLE_LEADS[i]) : 0);
+  charts['cpoChart'] = new Chart(document.getElementById('cpoChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'CPO',data:cpoData,backgroundColor:FUNNEL_DATA.map((_,i)=>i===selectedIdx?'#4a9eff':'#2a3a4a'),borderRadius:4,yAxisID:'y'},
+      {label:'Spend',type:'line',data:ADS_SPEND,borderColor:'#f5a623',backgroundColor:'transparent',tension:.35,pointRadius:4,yAxisID:'y2'}
+    ]},
+    options:{...BASE,scales:{
+      x:BASE.scales.x,
+      y:{...BASE.scales.y,ticks:{...TICK,callback:v=>'£'+v},position:'left'},
+      y2:{ticks:{...TICK,callback:v=>'£'+Math.round(v/1000)+'k'},grid:{display:false},position:'right',beginAtZero:true}
+    },plugins:{...BASE.plugins,legend:{display:true,labels:{color:'#666',font:{size:10,family:'DM Sans'},boxWidth:8,boxHeight:8}}}}
+  });
+
+  // ROI chart
+  dc('roiChart');
+  charts['roiChart'] = new Chart(document.getElementById('roiChart'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Pipeline value',data:FUNNEL_DATA.map(w=>w.pipelineValue),backgroundColor:'rgba(78,203,139,0.5)',borderRadius:3,stack:'s'},
+      {label:'Ads spend',type:'line',data:ADS_SPEND,borderColor:'#f5a623',backgroundColor:'transparent',tension:.35,pointRadius:4},
+      {label:'Order value',type:'line',data:FUNNEL_DATA.map(w=>w.deliveryValue),borderColor:'#2dd4bf',backgroundColor:'transparent',tension:.35,pointRadius:4,borderDash:[5,3]}
+    ]},
+    options:{...BASE,scales:{
+      x:BASE.scales.x,
+      y:{...BASE.scales.y,ticks:{...TICK,callback:v=>'£'+Math.round(v/1000)+'k'},stacked:false}
+    },plugins:{...BASE.plugins,legend:{display:true,labels:{color:'#666',font:{size:10,family:'DM Sans'},boxWidth:8,boxHeight:8}}}}
+  });
+}
+
+// ── Table ─────────────────────────────────────────────────────────────────────
+function renderTable(){
+  const body = document.getElementById('cpoTableBody');
+  body.innerHTML = FUNNEL_DATA.map((w,i) => {
+    const spend = ADS_SPEND[i];
+    const gLeads = GOOGLE_LEADS[i];
+    const cpo = gLeads > 0 ? Math.round(spend/gLeads) : 0;
+    const costPerOrder = w.deliveryCount > 0 ? Math.round(spend/w.deliveryCount) : 0;
+    const roi = spend > 0 ? (w.pipelineValue/spend).toFixed(1) : '—';
+    const isSelected = i === selectedIdx;
+    const cpoClass = cpo > 130 ? 'badge-red' : cpo > 100 ? 'badge-amber' : 'badge-green';
+    return `<tr style="${isSelected?'background:var(--surface2)':''}">
+      <td class="${isSelected?'highlight':''}">${w.weekLabel}</td>
+      <td class="num">${w.total}</td>
+      <td class="num">${gLeads}</td>
+      <td class="num">£${spend.toLocaleString()}</td>
+      <td class="num"><span class="badge ${cpoClass}">£${cpo}</span></td>
+      <td class="num">${w.deliveryCount > 0 ? w.deliveryCount : '—'}</td>
+      <td class="num">${costPerOrder > 0 ? '£'+costPerOrder.toLocaleString() : '—'}</td>
+      <td class="num">${w.avgOrderValue > 0 ? '£'+w.avgOrderValue.toLocaleString() : '—'}</td>
+      <td class="num">£${(w.pipelineValue/1000).toFixed(0)}k</td>
+      <td class="num">${roi}×</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+function renderAll(){
+  renderPills();
+  renderKPIs();
+  renderAlerts();
+  renderFunnel();
+  renderCharts();
+  renderStageValue();
+  renderTable();
+  document.getElementById('lastUpdated').textContent = `Last updated: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}`;
+}
+
+renderAll();
+</script>
+</body>
+</html>
