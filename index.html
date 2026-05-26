@@ -586,38 +586,66 @@ function renderKPIs() {
     return `<span class="kpi-sub ${diff > 0 ? 'up' : 'down'}">${diff > 0 ? '↑' : '↓'} ${Math.abs(diff)}% vs prev week</span>`;
   }
 
-  grid.innerHTML = `
-    <div class="kpi">
-      <div class="kpi-label">Latest week opps</div>
-      <div class="kpi-value">${latest.total}</div>
-      ${delta(latest, prev, 'total')}
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Google paid (latest)</div>
-      <div class="kpi-value">${latest.googlePaid}</div>
-      ${delta(latest, prev, 'googlePaid')}
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Unknown source %</div>
-      <div class="kpi-value">${Math.round(latest.unknown/latest.total*100)}%</div>
-      <span class="kpi-sub ${latest.unknown/latest.total > 0.35 ? 'down' : 'up'}">${latest.unknown} of ${latest.total} leads</span>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Referrals (latest)</div>
-      <div class="kpi-value">${latest.referral}</div>
-      ${delta(latest, prev, 'referral')}
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Social leads (latest)</div>
-      <div class="kpi-value">${latest.social}</div>
-      ${delta(latest, prev, 'social')}
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Closed lost (latest)</div>
-      <div class="kpi-value">${latest.closedLost}</div>
-      ${delta(latest, prev, 'closedLost')}
-    </div>
-  `;
+  // Build KPI cards from actual source keys in latest week
+  const sourceOrder = [
+    'Google / Baidu Ads',
+    'Google Ads (re-classified)',
+    'Organic search',
+    'Social',
+    'Referral / Professional',
+    'YouTube',
+    'Leadoo',
+    'Unknown',
+    'Unknown (logged as organic)',
+    'Other'
+  ];
+
+  const sourceLabels = {
+    'Google / Baidu Ads': 'Google / Baidu Ads',
+    'Google Ads (re-classified)': 'Google (reclassified)',
+    'Organic search': 'Organic search',
+    'Social': 'Social',
+    'Referral / Professional': 'Referral / Professional',
+    'YouTube': 'YouTube',
+    'Leadoo': 'Leadoo',
+    'Unknown': 'Unknown source',
+    'Unknown (logged as organic)': 'Mislogged as organic',
+    'Other': 'Other'
+  };
+
+  // Collect all sources that appear in latest or prev
+  const activeSources = sourceOrder.filter(s =>
+    (latest.sources[s] || 0) > 0 || (prev && (prev.sources[s] || 0) > 0)
+  );
+
+  const totalCard = `<div class="kpi">
+    <div class="kpi-label">Total opps</div>
+    <div class="kpi-value">${latest.total}</div>
+    ${delta(latest, prev, 'total')}
+  </div>`;
+
+  const sourceCards = activeSources.map(src => {
+    const cur = latest.sources[src] || 0;
+    const prv = prev ? (prev.sources[src] || 0) : null;
+    const pct = prv !== null && prv > 0 ? Math.round((cur - prv) / prv * 100) : null;
+    const isUnknown = src.includes('Unknown') || src.includes('Mislogged') || src.includes('Other');
+    const deltaHtml = pct !== null
+      ? `<span class="kpi-sub ${isUnknown ? (pct > 0 ? 'down' : 'up') : (pct > 0 ? 'up' : 'down')}">${pct > 0 ? '↑' : '↓'}${Math.abs(pct)}% vs prev</span>`
+      : `<span class="kpi-sub">new this week</span>`;
+    return `<div class="kpi">
+      <div class="kpi-label">${sourceLabels[src] || src}</div>
+      <div class="kpi-value">${cur}</div>
+      ${prv !== null ? deltaHtml : '<span class="kpi-sub">&nbsp;</span>'}
+    </div>`;
+  }).join('');
+
+  const closedCard = `<div class="kpi">
+    <div class="kpi-label">Closed lost</div>
+    <div class="kpi-value">${latest.closedLost}</div>
+    ${delta(latest, prev, 'closedLost')}
+  </div>`;
+
+  grid.innerHTML = totalCard + sourceCards + closedCard;
 }
 
 // ─── Alerts ───────────────────────────────────────────────────────────────────
@@ -738,7 +766,7 @@ document.addEventListener('drop', e => {
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-const BAKED_WEEKS = [{"weekLabel":"13 Apr \u2013 19 Apr","total":89,"sources":{"Social":5,"Google / Baidu Ads":50,"Unknown":19,"Google Ads (re-classified)":6,"Referral / Professional":6,"Organic search":1,"Leadoo":2},"stages":{"Closed Lost":53,"Validate":12,"Evaluate":7,"Negotiate":11,"Delivery":3,"Qualify":3},"intents":{"Cracking":12,"Subsidence":13,"Underpinning":20},"googlePaid":56,"organic":1,"social":5,"unknown":19,"referral":6,"leadoo":2,"youtube":0,"closedLost":53,"googleReclass":6},{"weekLabel":"20 Apr \u2013 26 Apr","total":79,"sources":{"Google Ads (re-classified)":3,"Unknown":23,"Social":3,"Google / Baidu Ads":47,"Referral / Professional":2,"Organic search":1},"stages":{"Validate":9,"Closed Lost":60,"Evaluate":4,"Negotiate":5,"Delivery":1},"intents":{"Cracking":10,"Underpinning":13,"Subsidence":15},"googlePaid":50,"organic":1,"social":3,"unknown":23,"referral":2,"leadoo":0,"youtube":0,"closedLost":60,"googleReclass":3},{"weekLabel":"27 Apr \u2013 3 May","total":108,"sources":{"Unknown":30,"Google / Baidu Ads":54,"Organic search":8,"Referral / Professional":4,"Google Ads (re-classified)":8,"YouTube":2,"Social":2},"stages":{"Closed Lost":56,"Qualify":18,"Negotiate":13,"Validate":13,"Evaluate":7,"Delivery":1},"intents":{"Subsidence":15,"Underpinning":9,"Resin":1,"Cracking":9},"googlePaid":62,"organic":8,"social":2,"unknown":30,"referral":4,"leadoo":0,"youtube":2,"closedLost":56,"googleReclass":8},{"weekLabel":"4 May \u2013 9 May","total":85,"sources":{"Unknown":37,"Google / Baidu Ads":38,"Social":8,"Google Ads (re-classified)":1,"Referral / Professional":1},"stages":{"Evaluate":10,"Closed Lost":39,"Validate":7,"Negotiate":6,"Qualify":23},"intents":{"Cracking":9,"Subsidence":13,"Underpinning":7},"googlePaid":39,"organic":0,"social":8,"unknown":37,"referral":1,"leadoo":0,"youtube":0,"closedLost":39,"googleReclass":1},{"weekLabel":"11 May \u2013 17 May","total":96,"sources":{"Unknown (logged as organic)":23,"YouTube":1,"Social":4,"Google / Baidu Ads":42,"Referral / Professional":3,"Google Ads (re-classified)":4,"Unknown":19},"stages":{"Closed Lost":44,"Validate":11,"Qualify":23,"Evaluate":10,"Negotiate":8},"intents":{"Cracking":7,"Resin":1,"Underpinning":17,"Subsidence":8},"googlePaid":46,"organic":0,"social":4,"unknown":42,"referral":3,"leadoo":0,"youtube":1,"closedLost":44,"googleReclass":4},{"weekLabel":"18 May \u2013 24 May","total":94,"sources":{"Unknown":34,"Organic search":2,"Referral / Professional":4,"Google Ads (re-classified)":5,"Social":2,"Other":1,"YouTube":1,"Google / Baidu Ads":45},"stages":{"Closed Lost":21,"Evaluate":15,"Qualify":50,"Validate":7,"nan":1},"intents":{"Subsidence":16,"Underpinning":14,"Cracking":1},"googlePaid":50,"organic":2,"social":2,"unknown":34,"referral":4,"leadoo":0,"youtube":1,"closedLost":21,"googleReclass":5}];
+const BAKED_WEEKS = [{"weekLabel":"13 Apr \u2013 19 Apr","total":106,"sources":{"Social":7,"Unknown":18,"Google / Baidu Ads":63,"Referral / Professional":7,"Google Ads (re-classified)":7,"Unknown (logged as organic)":1,"Leadoo":3},"stages":{"Closed Lost":76,"Evaluate":6,"Validate":11,"Qualify":3,"Negotiate":6,"Delivery":4},"intents":{"Subsidence":15,"Underpinning":28,"Cracking":12},"googlePaid":70,"organic":0,"social":7,"unknown":19,"referral":7,"leadoo":3,"youtube":0,"closedLost":76,"googleReclass":7},{"weekLabel":"20 Apr \u2013 26 Apr","total":79,"sources":{"Google Ads (re-classified)":3,"Unknown":23,"Unknown (logged as organic)":1,"Google / Baidu Ads":47,"Social":3,"Other":1,"Referral / Professional":1},"stages":{"Closed Lost":64,"Negotiate":5,"Validate":8,"Evaluate":1,"Delivery":1},"intents":{"Subsidence":15,"Underpinning":14,"Cracking":10},"googlePaid":50,"organic":0,"social":3,"unknown":24,"referral":1,"leadoo":0,"youtube":0,"closedLost":64,"googleReclass":3},{"weekLabel":"27 Apr \u2013 3 May","total":108,"sources":{"Referral / Professional":3,"Unknown (logged as organic)":8,"Google Ads (re-classified)":8,"Unknown":30,"Google / Baidu Ads":54,"YouTube":2,"Social":2,"Other":1},"stages":{"Delivery":2,"Validate":9,"Closed Lost":75,"Negotiate":14,"Evaluate":4,"Qualify":4},"intents":{"Subsidence":16,"Cracking":9,"Underpinning":10,"Resin":1},"googlePaid":62,"organic":0,"social":2,"unknown":38,"referral":3,"leadoo":0,"youtube":2,"closedLost":75,"googleReclass":8},{"weekLabel":"4 May \u2013 9 May","total":85,"sources":{"Unknown":35,"Google / Baidu Ads":38,"Social":9,"Google Ads (re-classified)":2,"Referral / Professional":1},"stages":{"Evaluate":9,"Closed Lost":54,"Negotiate":8,"Qualify":10,"Validate":3,"Delivery":1},"intents":{"Cracking":9,"Subsidence":13,"Underpinning":7},"googlePaid":40,"organic":0,"social":9,"unknown":35,"referral":1,"leadoo":0,"youtube":0,"closedLost":54,"googleReclass":2},{"weekLabel":"11 May \u2013 17 May","total":96,"sources":{"Unknown (logged as organic)":23,"YouTube":1,"Social":4,"Google / Baidu Ads":42,"Referral / Professional":3,"Google Ads (re-classified)":4,"Unknown":19},"stages":{"Closed Lost":44,"Validate":11,"Qualify":23,"Evaluate":10,"Negotiate":8},"intents":{"Cracking":7,"Resin":1,"Underpinning":17,"Subsidence":8},"googlePaid":46,"organic":0,"social":4,"unknown":42,"referral":3,"leadoo":0,"youtube":1,"closedLost":44,"googleReclass":4},{"weekLabel":"18 May \u2013 24 May","total":94,"sources":{"Unknown":34,"Organic search":2,"Referral / Professional":4,"Google Ads (re-classified)":5,"Social":2,"Other":1,"YouTube":1,"Google / Baidu Ads":45},"stages":{"Closed Lost":21,"Evaluate":15,"Qualify":50,"Validate":7,"nan":1},"intents":{"Subsidence":16,"Underpinning":14,"Cracking":1},"googlePaid":50,"organic":2,"social":2,"unknown":34,"referral":4,"leadoo":0,"youtube":1,"closedLost":21,"googleReclass":5}];
 loadState();
 const existingLabels = weeks.map(w=>w.weekLabel);
 BAKED_WEEKS.forEach(w=>{ if(!existingLabels.includes(w.weekLabel)) weeks.unshift(w); });
