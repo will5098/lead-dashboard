@@ -116,6 +116,8 @@
     align-items: center;
     gap: 5px;
   }
+  .pill{cursor:pointer;transition:background .15s,border-color .15s}
+  .pill.selected{background:#1a3a5c;border-color:var(--blue);color:var(--blue)}
   .pill button {
     background: none; border: none; color: var(--dim); cursor: pointer;
     font-size: 13px; line-height: 1; padding: 0; margin-left: 2px;
@@ -344,6 +346,7 @@
 // ─── State ───────────────────────────────────────────────────────────────────
 const STORAGE_KEY = 'lead_dashboard_v2';
 let weeks = [];
+let selectedWeekIdx = -1; // -1 = latest
 
 function saveState() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(weeks)); } catch(e) {}
@@ -575,8 +578,9 @@ function renderCharts() {
 function renderKPIs() {
   const grid = document.getElementById('kpiGrid');
   if (!weeks.length) { grid.innerHTML = ''; return; }
-  const latest = weeks[weeks.length - 1];
-  const prev = weeks.length > 1 ? weeks[weeks.length - 2] : null;
+  const activeIdx = selectedWeekIdx === -1 ? weeks.length - 1 : selectedWeekIdx;
+  const latest = weeks[activeIdx];
+  const prev = activeIdx > 1 ? weeks[weeks.length - 2] : null;
   const total4 = weeks.slice(-4).reduce((a,w) => a+w.total, 0);
 
   function delta(a, b, key) {
@@ -651,9 +655,10 @@ function renderKPIs() {
 // ─── Alerts ───────────────────────────────────────────────────────────────────
 function renderAlerts() {
   const box = document.getElementById('alerts');
-  if (weeks.length < 2) { box.innerHTML = ''; return; }
-  const latest = weeks[weeks.length - 1];
-  const prev = weeks[weeks.length - 2];
+  const activeIdx = selectedWeekIdx === -1 ? weeks.length - 1 : selectedWeekIdx;
+  if (weeks.length < 2 || activeIdx === 0) { box.innerHTML = ''; return; }
+  const latest = weeks[activeIdx];
+  const prev = weeks[activeIdx - 1];
   const alerts = [];
 
   const unknownPct = Math.round(latest.unknown / latest.total * 100);
@@ -689,11 +694,21 @@ function renderPills() {
     container.innerHTML = '<span>Weeks loaded:</span><em style="font-size:12px;color:var(--dim);font-style:normal">None — upload a CSV to begin</em>';
     return;
   }
+  const active = selectedWeekIdx === -1 ? weeks.length - 1 : selectedWeekIdx;
   container.innerHTML = '<span>Weeks loaded:</span>' + weeks.map((w,i) => `
-    <span class="pill">${w.weekLabel} (${w.total})
-      <button onclick="removeWeek(${i})" title="Remove this week">×</button>
+    <span class="pill ${i === active ? 'selected' : ''}" onclick="selectWeek(${i})">${w.weekLabel} (${w.total})
+      <button onclick="event.stopPropagation();removeWeek(${i})" title="Remove this week">×</button>
     </span>
   `).join('');
+}
+
+function selectWeek(idx) {
+  selectedWeekIdx = idx;
+  renderPills();
+  renderKPIs();
+  renderAlerts();
+  renderCharts();
+  renderTable();
 }
 
 // ─── Render all ───────────────────────────────────────────────────────────────
