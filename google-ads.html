@@ -314,10 +314,7 @@
         <div class="card-title">Conversions by week</div>
         <div class="chart-wrap" style="height:200px"><canvas id="convChart" role="img" aria-label="Conversions per week"></canvas></div>
       </div>
-      <div class="card chart-full">
-        <div class="card-title">Impression share vs lost IS (rank) — latest week, search campaigns</div>
-        <div class="chart-wrap" style="height:240px"><canvas id="isChart" role="img" aria-label="Impression share by campaign"></canvas></div>
-      </div>
+
       <div class="card chart-full">
         <div class="card-title">Campaign breakdown — latest week</div>
         <div style="overflow-x:auto">
@@ -483,87 +480,9 @@ function renderCharts() {
   const searchCamps = latest.campaigns.filter(c => c.type === 'Search' && (c.is > 0 || c.isLost > 0));
   const campLabels = searchCamps.map(c => c.name.length > 38 ? c.name.substring(0,36)+'…' : c.name);
 
-  destroyChart('isChart');
-  charts['isChart'] = new Chart(document.getElementById('isChart'), {
-    type: 'bar',
-    data: {
-      labels: campLabels,
-      datasets: [
-        { label: 'Impression share', data: searchCamps.map(c=>c.is), backgroundColor: '#4a9eff', borderRadius: 2 },
-        { label: 'Lost IS (rank)', data: searchCamps.map(c=>c.isLost), backgroundColor: 'rgba(255,95,95,0.4)', borderRadius: 2 }
-      ]
-    },
-    options: {
-      ...BASE,
-      indexAxis: 'y',
-      plugins: { ...BASE.plugins, legend: { display: true, labels: { color: '#666', font: { size: 11, family: 'DM Sans' }, boxWidth: 10, boxHeight: 10 } } },
-      scales: {
-        x: { ticks: { ...TICK, callback: v => v+'%' }, grid: GRID, max: 100 },
-        y: { ticks: { ...TICK, font: { family: 'DM Sans', size: 11 } }, grid: { display: false } }
-      }
-    }
-  });
 
-  // isChart wrapper needs more height for many campaigns
-  document.querySelector('#isChart').closest('.chart-wrap').style.height = Math.max(240, searchCamps.length * 38 + 60) + 'px';
-}
 
-function renderKPIs() {
-  const grid = document.getElementById('kpiGrid');
-  if (!weeks.length) { grid.innerHTML = ''; return; }
-  const l = weeks[weeks.length-1];
-  const p = weeks.length > 1 ? weeks[weeks.length-2] : null;
-
-  function delta(cur, prev, key, prefix='', suffix='', invert=false) {
-    if (!prev) return '';
-    const pv = prev[key], cv = cur[key];
-    if (!pv) return '';
-    const pct = Math.round((cv-pv)/pv*100);
-    if (pct === 0) return '<span class="kpi-sub">no change</span>';
-    const up = invert ? pct < 0 : pct > 0;
-    return `<span class="kpi-sub ${up?'up':'down'}">${pct>0?'↑':'↓'} ${Math.abs(pct)}% vs prev</span>`;
-  }
-
-  const cpa = l.totalConv > 0 ? (l.totalSpend/l.totalConv).toFixed(2) : '—';
-
-  grid.innerHTML = `
-    <div class="kpi"><div class="kpi-label">Total clicks</div><div class="kpi-value">${l.totalClicks.toLocaleString()}</div>${delta(l,p,'totalClicks')}</div>
-    <div class="kpi"><div class="kpi-label">Total spend</div><div class="kpi-value">£${Math.round(l.totalSpend).toLocaleString()}</div>${delta(l,p,'totalSpend','£','',true)}</div>
-    <div class="kpi"><div class="kpi-label">Avg. CPC</div><div class="kpi-value">£${l.avgCPC.toFixed(2)}</div>${delta(l,p,'avgCPC','£','',true)}</div>
-    <div class="kpi"><div class="kpi-label">Conversions</div><div class="kpi-value">${l.totalConv.toFixed(1)}</div>${delta(l,p,'totalConv')}</div>
-    <div class="kpi"><div class="kpi-label">Cost / conv.</div><div class="kpi-value">${cpa === '—' ? '—' : '£'+cpa}</div></div>
-    <div class="kpi"><div class="kpi-label">Avg impr. share</div><div class="kpi-value">${Math.round(l.avgIS)}%</div>${delta(l,p,'avgIS')}</div>
-  `;
-}
-
-function renderAlerts() {
-  const box = document.getElementById('alerts');
-  if (weeks.length < 2) { box.innerHTML = ''; return; }
-  const l = weeks[weeks.length-1], p = weeks[weeks.length-2];
-  const alerts = [];
-
-  const clickDelta = p.totalClicks > 0 ? Math.round((l.totalClicks-p.totalClicks)/p.totalClicks*100) : 0;
-  if (clickDelta <= -20) alerts.push({type:'danger', text:`<strong>Significant click drop:</strong> Clicks fell from ${p.totalClicks.toLocaleString()} to ${l.totalClicks.toLocaleString()} (${clickDelta}%). Check for paused campaigns, budget caps, or impression share loss.`});
-  else if (clickDelta <= -10) alerts.push({type:'warn', text:`<strong>Click volume dip:</strong> Down ${Math.abs(clickDelta)}% week on week — worth monitoring.`});
-
-  const cpcDelta = p.avgCPC > 0 ? Math.round((l.avgCPC-p.avgCPC)/p.avgCPC*100) : 0;
-  if (cpcDelta >= 20) alerts.push({type:'danger', text:`<strong>CPC spike:</strong> Average CPC up ${cpcDelta}% to £${l.avgCPC.toFixed(2)}. Increased competition or bid strategy change likely.`});
-  else if (cpcDelta >= 10) alerts.push({type:'warn', text:`<strong>CPC rising:</strong> Up ${cpcDelta}% to £${l.avgCPC.toFixed(2)} — watch for budget compression.`});
-
-  const latest = weeks[weeks.length-1];
-  const highISLoss = latest.campaigns.filter(c => c.type === 'Search' && c.isLost > 60);
-  if (highISLoss.length > 0) alerts.push({type:'warn', text:`<strong>High impression share loss (rank):</strong> ${highISLoss.length} campaign${highISLoss.length>1?'s':''} losing >60% of available impressions due to ad rank — <em>${highISLoss.map(c=>c.name.split(' - ')[0]).join(', ')}</em>. Consider increasing bids or improving Quality Score.`});
-
-  const convDelta = p.totalConv > 0 ? Math.round((l.totalConv-p.totalConv)/p.totalConv*100) : 0;
-  if (convDelta >= 20) alerts.push({type:'ok', text:`<strong>Conversions up ${convDelta}%:</strong> ${l.totalConv.toFixed(1)} this week vs ${p.totalConv.toFixed(1)} last week.`});
-
-  const endedWithBudget = latest.campaigns.filter(c => c.status.toLowerCase().includes('ended') && c.budget > 0);
-  if (endedWithBudget.length >= 5) alerts.push({type:'warn', text:`<strong>${endedWithBudget.length} campaigns have ended</strong> but still carry budgets in the account — consider archiving or repurposing their budgets.`});
-
-  box.innerHTML = alerts.map(a => `<div class="alert alert-${a.type}">${a.text}</div>`).join('');
-}
-
-function renderTable() {
+  renderTable() {
   if (!weeks.length) return;
   const latest = weeks[weeks.length-1];
   const body = document.getElementById('campaignBody');
@@ -699,6 +618,7 @@ function openPanel(campName) {
 
   if (lc) {
     html += `<div class="panel-kpis">
+      <div class="panel-kpi"><div class="panel-kpi-label">Impressions</div><div class="panel-kpi-value">${lc.impressions.toLocaleString()}</div><div class="panel-kpi-sub">${pctDelta(lc,pc,'impressions')} vs prev</div></div>
       <div class="panel-kpi"><div class="panel-kpi-label">Clicks</div><div class="panel-kpi-value">${lc.clicks.toLocaleString()}</div><div class="panel-kpi-sub">${pctDelta(lc,pc,'clicks')} vs prev</div></div>
       <div class="panel-kpi"><div class="panel-kpi-label">Spend</div><div class="panel-kpi-value">£${Math.round(lc.cost).toLocaleString()}</div><div class="panel-kpi-sub">${pctDelta(lc,pc,'cost')} vs prev</div></div>
       <div class="panel-kpi"><div class="panel-kpi-label">Conv. rate</div><div class="panel-kpi-value">${convRate}${convRate!=='—'?'%':''}</div><div class="panel-kpi-sub">${pc && pc.clicks > 0 ? pctDelta({v:lc.conversions/lc.clicks},{v:pc.conversions/pc.clicks},'v') : ''} vs prev</div></div>
