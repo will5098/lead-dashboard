@@ -516,7 +516,7 @@ function renderTable(){
     const deltaStr=sessDelta!=null?`<span style="font-size:10px;color:${sessDelta>0?'var(--green)':sessDelta<0?'var(--red)':'var(--dim)'}">${sessDelta>0?'↑':'↓'}${Math.abs(sessDelta)}%</span>`:'';
     const ch=r.channel;
     const convRatePct=(r.convRate*100).toFixed(1);
-    return `<tr class="clickable" onclick="openPanel('${r.src.replace(/'/g,"\\'")}')">
+    return `<tr class="clickable" onclick="openPanel('${r.src.replace(/'/g,"\\'")}','${(r.property||'Main site').replace(/'/g,"\\'")}')">
       <td style="color:var(--text);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.src}">${r.src}</td>
       <td><span style="font-size:10px;color:var(--muted)">${r.property||'Main site'}</span></td>
       <td><span class="channel-badge ${CHANNEL_BADGE[ch]||'ch-other'}">${ch}</span></td>
